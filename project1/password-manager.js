@@ -1,124 +1,283 @@
 "use strict";
 
 /********* External Imports ********/
-
 const { stringToBuffer, bufferToString, encodeBuffer, decodeBuffer, getRandomBytes } = require("./lib");
 const { subtle } = require('crypto').webcrypto;
 
 /********* Constants ********/
-
-const PBKDF2_ITERATIONS = 100000; // number of iterations for PBKDF2 algorithm
-const MAX_PASSWORD_LENGTH = 64;   // we can assume no password is longer than this many characters
+const PBKDF2_ITERATIONS = 100000;
+const MAX_PASSWORD_LENGTH = 64;
 
 /********* Implementation ********/
 class Keychain {
-  /**
-   * Initializes the keychain using the provided information. Note that external
-   * users should likely never invoke the constructor directly and instead use
-   * either Keychain.init or Keychain.load. 
-   * Arguments:
-   *  You may design the constructor with any parameters you would like. 
-   * Return Type: void
-   */
-  constructor() {
-    this.data = { 
-      /* Store member variables that you intend to be public here
-         (i.e. information that will not compromise security if an adversary sees) */
+  constructor(kvs = {}, salt = null, masterBits = null, aesKey = null, domainKey = null) {
+    this.data = {
+      kvs: kvs,
+      salt: salt,
     };
     this.secrets = {
-      /* Store member variables that you intend to be private here
-         (information that an adversary should NOT see). */
+      masterBits: masterBits,
+      aesKey: aesKey,
+      domainKey: domainKey
     };
-
-    throw "Not Implemented!";
   };
 
-  /** 
-    * Creates an empty keychain with the given password.
-    *
-    * Arguments:
-    *   password: string
-    * Return Type: void
-    */
-  static async init(password) {
-    throw "Not Implemented!";
+  /******************************************************************
+   * Helper Functions
+   ******************************************************************/
+
+  static async _deriveMasterBits(password, saltBuf) {
+    const keyMaterial = await subtle.importKey(
+      "raw",
+      stringToBuffer(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"]
+    );
+
+    return await subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt: saltBuf,
+        iterations: PBKDF2_ITERATIONS,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      256
+    );
   }
 
-  /**
-    * Loads the keychain state from the provided representation (repr). The
-    * repr variable will contain a JSON encoded serialization of the contents
-    * of the KVS (as returned by the dump function). The trustedDataCheck
-    * is an *optional* SHA-256 checksum that can be used to validate the 
-    * integrity of the contents of the KVS. If the checksum is provided and the
-    * integrity check fails, an exception should be thrown. You can assume that
-    * the representation passed to load is well-formed (i.e., it will be
-    * a valid JSON object).Returns a Keychain object that contains the data
-    * from repr. 
-    *
-    * Arguments:
-    *   password:           string
-    *   repr:               string
-    *   trustedDataCheck: string
-    * Return Type: Keychain
-    */
+  static async _importHmacKey(rawBuf) {
+    return await subtle.importKey(
+      "raw",
+      rawBuf,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign", "verify"]
+    );
+  }
+
+  static async _importAesKey(rawBuf) {
+    return await subtle.importKey(
+      "raw",
+      rawBuf,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  static async _hmacRaw(hmacKey, dataString) {
+    const buf = stringToBuffer(dataString);
+    return await subtle.sign("HMAC", hmacKey, buf);
+  }
+
+  static async _hmacBase64(hmacKey, dataString) {
+    const raw = await this._hmacRaw(hmacKey, dataString);
+    return encodeBuffer(raw);
+  }
+
+  _padPassword(buf) {
+    const raw = new Uint8Array(buf);
+    if (raw.length > MAX_PASSWORD_LENGTH) {
+      throw new Error(`Password exceeds maximum length of ${MAX_PASSWORD_LENGTH} bytes`);
+    }
+    const out = new Uint8Array(MAX_PASSWORD_LENGTH);
+    out.set(raw);
+    return out.buffer;
+  }
+
+  _unpadPassword(buf) {
+    const raw = new Uint8Array(buf);
+    let end = raw.length;
+    while (end > 0 && raw[end - 1] === 0) end--;
+    return raw.slice(0, end).buffer;
+  }
+
+  /******************************************************************
+   * Public API
+   ******************************************************************/
+
+  static async init(password) {
+    if (!password || typeof password !== 'string' || password.length === 0) {
+      throw new Error("Password must be a non-empty string");
+    }
+
+    const saltBuf = getRandomBytes(16);
+    const saltB64 = encodeBuffer(saltBuf);
+
+    const masterBits = await this._deriveMasterBits(password, saltBuf);
+    const masterHmacKey = await this._importHmacKey(masterBits);
+
+    const encRaw = await this._hmacRaw(masterHmacKey, "enc");
+    const domainRaw = await this._hmacRaw(masterHmacKey, "domain");
+
+    const aesKey = await this._importAesKey(encRaw);
+    const domainKey = await this._importHmacKey(domainRaw);
+
+    return new Keychain({}, saltB64, masterBits, aesKey, domainKey);
+  }
+
   static async load(password, repr, trustedDataCheck) {
-    throw "Not Implemented!";
-  };
+    if (!password || typeof password !== 'string') {
+      throw new Error("Password must be a non-empty string");
+    }
 
-  /**
-    * Returns a JSON serialization of the contents of the keychain that can be 
-    * loaded back using the load function. The return value should consist of
-    * an array of two strings:
-    *   arr[0] = JSON encoding of password manager
-    *   arr[1] = SHA-256 checksum (as a string)
-    * As discussed in the handout, the first element of the array should contain
-    * all of the data in the password manager. The second element is a SHA-256
-    * checksum computed over the password manager to preserve integrity.
-    *
-    * Return Type: array
-    */ 
+    if (!repr || typeof repr !== 'string') {
+      throw new Error("Invalid representation data");
+    }
+
+    let obj;
+    try {
+      obj = JSON.parse(repr);
+    } catch (e) {
+      throw new Error("Failed to parse keychain data");
+    }
+
+    /* integrity check — must THROW on mismatch */
+    if (trustedDataCheck) {
+      const digest = await subtle.digest("SHA-256", stringToBuffer(repr));
+      const digestB64 = encodeBuffer(digest);
+      if (digestB64 !== trustedDataCheck) {
+        throw new Error("Integrity check failed - data may have been tampered with");
+      }
+    }
+
+    if (!obj.salt) {
+      throw new Error("Invalid keychain format: missing salt");
+    }
+
+    const saltBuf = decodeBuffer(obj.salt);
+
+    /* derive keys */
+    let masterBits;
+    try {
+      masterBits = await this._deriveMasterBits(password, saltBuf);
+    } catch (e) {
+      throw new Error("Failed to derive keys");
+    }
+
+    const masterHmacKey = await this._importHmacKey(masterBits);
+    const encRaw = await this._hmacRaw(masterHmacKey, "enc");
+    const domainRaw = await this._hmacRaw(masterHmacKey, "domain");
+
+    const aesKey = await this._importAesKey(encRaw);
+    const domainKey = await this._importHmacKey(domainRaw);
+
+    /* password verification step */
+    const keys = Object.keys(obj.kvs);
+    if (keys.length > 0) {
+      const lookup = keys[0];
+      const rec = obj.kvs[lookup];
+      try {
+        await subtle.decrypt(
+          {
+            name: "AES-GCM",
+            iv: decodeBuffer(rec.iv),
+            additionalData: decodeBuffer(lookup)
+          },
+          aesKey,
+          decodeBuffer(rec.ciphertext)
+        );
+      } catch {
+        throw new Error("Incorrect password");
+      }
+    }
+
+    return new Keychain(obj.kvs, obj.salt, masterBits, aesKey, domainKey);
+  }
+
   async dump() {
-    throw "Not Implemented!";
-  };
+    const data = {
+      kvs: this.data.kvs,
+      salt: this.data.salt
+    };
 
-  /**
-    * Fetches the data (as a string) corresponding to the given domain from the KVS.
-    * If there is no entry in the KVS that matches the given domain, then return
-    * null.
-    *
-    * Arguments:
-    *   name: string
-    * Return Type: Promise<string>
-    */
+    const repr = JSON.stringify(data);
+    const digest = await subtle.digest("SHA-256", stringToBuffer(repr));
+    const digestB64 = encodeBuffer(digest);
+
+    return [repr, digestB64];
+  }
+
   async get(name) {
-    throw "Not Implemented!";
-  };
+    if (!name || typeof name !== 'string') {
+      throw new Error("Name must be a non-empty string");
+    }
 
-  /** 
-  * Inserts the domain and associated data into the KVS. If the domain is
-  * already in the password manager, this method should update its value. If
-  * not, create a new entry in the password manager.
-  *
-  * Arguments:
-  *   name: string
-  *   value: string
-  * Return Type: void
-  */
+    const rawLookup = await Keychain._hmacRaw(this.secrets.domainKey, name);
+    const lookup = encodeBuffer(rawLookup);
+
+    if (!(lookup in this.data.kvs)) return null;
+
+    const rec = this.data.kvs[lookup];
+
+    try {
+      const pt = await subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: decodeBuffer(rec.iv),
+          additionalData: rawLookup
+        },
+        this.secrets.aesKey,
+        decodeBuffer(rec.ciphertext)
+      );
+
+      const unpadded = this._unpadPassword(pt);
+      return bufferToString(unpadded);
+    } catch (e) {
+      throw new Error(`Failed to decrypt password for '${name}'`);
+    }
+  }
+
   async set(name, value) {
-    throw "Not Implemented!";
-  };
+    if (!name || typeof name !== 'string') {
+      throw new Error("Name must be a non-empty string");
+    }
 
-  /**
-    * Removes the record with name from the password manager. Returns true
-    * if the record with the specified name is removed, false otherwise.
-    *
-    * Arguments:
-    *   name: string
-    * Return Type: Promise<boolean>
-  */
+    if (!value || typeof value !== 'string') {
+      throw new Error("Value must be a non-empty string");
+    }
+
+    const rawLookup = await Keychain._hmacRaw(this.secrets.domainKey, name);
+    const lookup = encodeBuffer(rawLookup);
+
+    const ptBuf = stringToBuffer(value);
+    const padded = this._padPassword(ptBuf);
+
+    const iv = getRandomBytes(12);
+
+    const ciphertext = await subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: iv,
+        additionalData: rawLookup
+      },
+      this.secrets.aesKey,
+      padded
+    );
+
+    this.data.kvs[lookup] = {
+      iv: encodeBuffer(iv),
+      ciphertext: encodeBuffer(ciphertext)
+    };
+  }
+
   async remove(name) {
-    throw "Not Implemented!";
-  };
+    if (!name || typeof name !== 'string') {
+      throw new Error("Name must be a non-empty string");
+    }
+
+    const rawLookup = await Keychain._hmacRaw(this.secrets.domainKey, name);
+    const lookup = encodeBuffer(rawLookup);
+
+    if (lookup in this.data.kvs) {
+      delete this.data.kvs[lookup];
+      return true;
+    }
+
+    return false;
+  }
 };
 
-module.exports = { Keychain }
+module.exports = { Keychain };
