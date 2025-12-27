@@ -76,8 +76,29 @@ class ChatService {
       console.log('Registration successful');
     });
 
-    this.socket.on('users_list', (data) => {
+    this.socket.on('users_list', async (data) => {
       console.log('Users list:', data.users);
+      if (data.users && Array.isArray(data.users)) {
+        for (const user of data.users) {
+          // Skip current user
+          if (this.currentUser && user.username === this.currentUser) continue;
+          
+          try {
+            // The server sends { username, publicKey }
+            // We construct the certificate object as expected by Messenger
+            const certificate = {
+              username: user.username,
+              publicKey: user.publicKey
+            };
+            
+            // Pass null for signature since server doesn't provide it
+            await this.receiveCertificate(certificate, null);
+            console.log(`Received certificate for ${user.username}`);
+          } catch (err) {
+            console.error(`Failed to process certificate for ${user.username}:`, err);
+          }
+        }
+      }
     });
 
     this.socket.on('send_success', () => {
@@ -232,10 +253,10 @@ class ChatService {
       );
 
       const header = {
-        receiverIV: this._base64ToArrayBuffer(payload.header.receiverIV),
+        receiverIV: new Uint8Array(this._base64ToArrayBuffer(payload.header.receiverIV)),
         vGov: vGovKey, // Restored as CryptoKey
-        ivGov: this._base64ToArrayBuffer(payload.header.ivGov),
-        cGov: this._base64ToArrayBuffer(payload.header.cGov),
+        ivGov: new Uint8Array(this._base64ToArrayBuffer(payload.header.ivGov)),
+        cGov: new Uint8Array(this._base64ToArrayBuffer(payload.header.cGov)),
         messageNumber: payload.header.messageNumber,
         prevChainLength: payload.header.prevChainLength
       };
@@ -366,3 +387,4 @@ class ChatService {
 // Export singleton instance
 export default new ChatService();
 
+// Fixed usages

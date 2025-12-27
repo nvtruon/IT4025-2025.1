@@ -25,7 +25,7 @@ export async function cryptoKeyToJSON(cryptoKey) {
 
 export async function generateEG() {
   // tạo cặp khóa ECDH
-  const keypair = await subtle.generateKey({ name: 'ECDH', namedCurve: 'P-384' }, true, ['deriveKey'])
+  const keypair = await subtle.generateKey({ name: 'ECDH', namedCurve: 'P-384' }, true, ['deriveKey', 'deriveBits'])
   const keypairObject = { pub: keypair.publicKey, sec: keypair.privateKey }
   return keypairObject
 }
@@ -155,3 +155,4 @@ export async function signWithECDSA(privateKey, message) {
 // Export bufferToString for use in other files
 export { bufferToString }
 
+// Fixed usages

@@ -25,7 +25,7 @@ export async function getGovPublicKey() {
   const keyPair = await subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-384' },
     true,
-    ['deriveKey']
+    ['deriveKey', 'deriveBits']
   );
   
   cachedGovPublicKey = keyPair.publicKey;
@@ -44,13 +44,14 @@ export async function getCAPublicKey() {
   }
 
   const { subtle } = window.crypto;
+  console.log("Generating CA Key with usages: ['sign', 'verify']");
   
   // Generate a key pair (we only use the public key)
   // For a true hardcoded constant, generate once and store the JWK in the constants
   const keyPair = await subtle.generateKey(
     { name: 'ECDSA', namedCurve: 'P-384' },
     true,
-    ['verify']
+    ['sign', 'verify']
   );
   
   cachedCAPublicKey = keyPair.publicKey;

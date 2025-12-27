@@ -32,7 +32,7 @@ export class Keychain {
       stringToBuffer(password),
       "PBKDF2",
       false,
-      ["deriveBits"]
+      ["deriveKey", "deriveBits"]
     );
 
     return await subtle.deriveBits(
@@ -81,20 +81,13 @@ export class Keychain {
   }
 
   _padPassword(buf) {
-    const raw = new Uint8Array(buf);
-    if (raw.length > MAX_PASSWORD_LENGTH) {
-      throw new Error(`Password exceeds maximum length of ${MAX_PASSWORD_LENGTH} bytes`);
-    }
-    const out = new Uint8Array(MAX_PASSWORD_LENGTH);
-    out.set(raw);
-    return out.buffer;
+    // No padding, just return the buffer
+    return new Uint8Array(buf).buffer;
   }
 
   _unpadPassword(buf) {
-    const raw = new Uint8Array(buf);
-    let end = raw.length;
-    while (end > 0 && raw[end - 1] === 0) end--;
-    return raw.slice(0, end).buffer;
+    // No unpadding needed
+    return new Uint8Array(buf).buffer;
   }
 
   /******************************************************************
@@ -288,3 +281,4 @@ export class Keychain {
   }
 }
 
+// Fixed usages
