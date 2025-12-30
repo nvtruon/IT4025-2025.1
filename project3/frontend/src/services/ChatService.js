@@ -11,6 +11,7 @@ class ChatService {
     this.currentUser = null;
     this.messageHandlers = [];
     this.serverUrl = 'http://localhost:3000'; // Default port 3000 (configurable via init)
+    this._connectionResolvers = []; // For waiting on connection
   }
 
   /**
@@ -55,6 +56,11 @@ class ChatService {
     this.socket.on('connect', () => {
       console.log('Connected to chat server');
       this.connected = true;
+      // Resolve pending connection promises
+      if (this._connectionResolvers) {
+        this._connectionResolvers.forEach(resolve => resolve());
+        this._connectionResolvers = [];
+      }
     });
 
     this.socket.on('disconnect', () => {
@@ -106,6 +112,27 @@ class ChatService {
     });
   }
 
+  /**Wait for socket connection to be established
+   * @returns {Promise<void>}
+   */
+  async waitForConnection() {
+    if (this.connected) {
+      return; // Already connected
+    }
+
+    // Wait for connection with timeout
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout - server may not be running'));
+      }, 5000);
+
+      this._connectionResolvers.push(() => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
+
   /**
    * Register user with the server
    * @param {string} username - Username to register
@@ -116,8 +143,9 @@ class ChatService {
       throw new Error('ChatService not initialized. Call init() first.');
     }
 
-    if (!this.socket || !this.connected) {
-      throw new Error('Not connected to server');
+    // Wait for connection if not connected yet
+    if (!this.connected) {
+      await this.waitForConnection();
     }
 
     // Generate certificate

@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import ChatService from '../services/ChatService.js';
 import StorageService from '../services/StorageService.js';
+import UserList from './UserList.jsx';
+import ChatHeader from './ChatHeader.jsx';
+import MessageList from './MessageList.jsx';
+import MessageInput from './MessageInput.jsx';
+import BottomNav from './BottomNav.jsx';
 
 function ChatScreen({ username, onLogout }) {
   const [users, setUsers] = useState([]);
@@ -125,118 +130,51 @@ function ChatScreen({ username, onLogout }) {
 
   return (
     <div style={styles.container}>
-      {/* Left Sidebar - User List */}
+      {/* Left Sidebar - Chats List */}
       <div style={styles.sidebar}>
         <div style={styles.sidebarHeader}>
-          <h2 style={styles.sidebarTitle}>Online Users</h2>
-          <div style={styles.userInfo}>
-            <span style={styles.currentUser}>{username}</span>
-            <button onClick={onLogout} style={styles.logoutButton}>
-              Logout
-            </button>
-          </div>
+          <h2 style={styles.sidebarTitle}>Chats</h2>
+          <button style={styles.menuButton}>⋮</button>
         </div>
         
-        <div style={styles.userList}>
-          {users.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p>No other users online</p>
-              <button 
-                onClick={() => ChatService.getUsers()} 
-                style={styles.refreshButton}
-              >
-                Refresh
-              </button>
-            </div>
-          ) : (
-            users.map((user) => (
-              <div
-                key={user.username}
-                onClick={() => setSelectedUser(user.username)}
-                style={{
-                  ...styles.userItem,
-                  ...(selectedUser === user.username ? styles.userItemSelected : {})
-                }}
-              >
-                <div style={styles.userAvatar}>
-                  {user.username.charAt(0).toUpperCase()}
-                </div>
-                <div style={styles.userDetails}>
-                  <div style={styles.userName}>{user.username}</div>
-                  <div style={styles.userStatus}>Online</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <UserList
+          users={users}
+          selectedUser={selectedUser}
+          onSelectUser={setSelectedUser}
+          onRefresh={() => ChatService.getUsers()}
+        />
+
+        <BottomNav />
       </div>
 
       {/* Right Side - Chat Window */}
       <div style={styles.chatArea}>
         {selectedUser ? (
           <>
-            {/* Chat Header */}
-            <div style={styles.chatHeader}>
-              <div style={styles.chatHeaderUser}>
-                <div style={styles.chatAvatar}>
-                  {selectedUser.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={styles.chatUserName}>{selectedUser}</div>
-                  <div style={styles.chatUserStatus}>Online</div>
-                </div>
-              </div>
-            </div>
+            <ChatHeader username={selectedUser} />
 
-            {/* Messages */}
-            <div style={styles.messagesContainer}>
-              {loading ? (
-                <div style={styles.loading}>Loading messages...</div>
-              ) : messages.length === 0 ? (
-                <div style={styles.emptyChat}>
-                  <p>No messages yet. Start the conversation!</p>
-                </div>
-              ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      ...styles.message,
-                      ...(message.direction === 'outgoing' ? styles.messageOutgoing : styles.messageIncoming)
-                    }}
-                  >
-                    <div style={{
-                      ...styles.messageContent,
-                      ...(message.direction === 'outgoing' ? styles.messageOutgoingContent : styles.messageIncomingContent)
-                    }}>
-                      {message.text}
-                    </div>
-                    <div style={styles.messageTime}>
-                      {formatTime(message.timestamp)}
-                    </div>
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+            <MessageList
+              messages={messages}
+              loading={loading}
+              formatTime={formatTime}
+              ref={messagesEndRef}
+            />
 
-            {/* Message Input */}
-            <form onSubmit={handleSendMessage} style={styles.inputContainer}>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                style={styles.messageInput}
-              />
-              <button type="submit" style={styles.sendButton}>
-                Send
-              </button>
-            </form>
+            <MessageInput
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onSubmit={handleSendMessage}
+            />
           </>
         ) : (
           <div style={styles.noSelection}>
             <p>Select a user from the sidebar to start chatting</p>
+            <div style={styles.userInfo}>
+              <span style={styles.currentUserBadge}>Logged in as: {username}</span>
+              <button onClick={onLogout} style={styles.logoutButton}>
+                Logout
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -248,224 +186,206 @@ const styles = {
   container: {
     display: 'flex',
     height: '100vh',
-    backgroundColor: '#f5f5f5'
+    width: '100vw',
+    margin: 0,
+    backgroundColor: '#f5f7fa',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    overflow: 'hidden',
+    gap: '16px',
+    padding: '0 8px 0 0'
   },
   sidebar: {
-    width: '300px',
-    backgroundColor: '#fff',
-    borderRight: '1px solid #e0e0e0',
+    width: '500px',
+    backgroundColor: '#ffffff',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    borderRight: 'none',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    borderRadius: '20px',
+    overflow: 'hidden'
   },
   sidebarHeader: {
-    padding: '20px',
-    borderBottom: '1px solid #e0e0e0'
-  },
-  sidebarTitle: {
-    margin: '0 0 15px 0',
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#333'
-  },
-  userInfo: {
+    padding: '24px 24px',
+    borderBottom: '2px solid #e8ecf1',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    minHeight: '76p20px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    borderRadius: '0 20px 0 0'
   },
-  currentUser: {
-    fontSize: '14px',
-    color: '#666',
-    fontWeight: '500'
+  sidebarTitle: {
+    margin: 0,
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#1a1d29',
+    letterSpacing: '-0.5px'
   },
-  logoutButton: {
-    padding: '6px 12px',
-    fontSize: '12px',
-    backgroundColor: '#dc3545',
-    color: 'white',
+  menuButton: {
+    width: '40px',
+    height: '40px',
     border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
+    backgroundColor: '#f5f7fa',
+    fontSize: '20px',
+    cursor: 'pointer',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#5b6b7c',
+    transition: 'all 0.2s'
   },
   userList: {
     flex: 1,
-    overflowY: 'auto'
+    overflowY: 'auto',
+    backgroundColor: '#ffffff'
   },
   emptyState: {
     padding: '20px',
     textAlign: 'center',
-    color: '#999'
+    color: '#65676b'
   },
   refreshButton: {
     marginTop: '10px',
     padding: '8px 16px',
-    backgroundColor: '#007bff',
+    backgroundColor: '#667eea',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px'
+    fontSize: '14px',
+    fontWeight: '600'
   },
   userItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '12px 20px',
+    padding: '12px 16px',
     cursor: 'pointer',
-    borderBottom: '1px solid #f0f0f0',
-    transition: 'background-color 0.2s'
+    transition: 'background-color 0.2s',
+    backgroundColor: '#ffffff'
   },
   userItemSelected: {
-    backgroundColor: '#e3f2fd',
-    borderLeft: '3px solid #2196f3'
+    backgroundColor: '#e7f3ff'
   },
   userAvatar: {
-    width: '40px',
-    height: '40px',
+    width: '56px',
+    height: '56px',
     borderRadius: '50%',
-    backgroundColor: '#2196f3',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: '600',
-    marginRight: '12px'
+    marginRight: '12px',
+    flexShrink: 0
   },
   userDetails: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   userName: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333',
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#050505',
+    marginBottom: '4px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  lastMessage: {
+    fontSize: '13px',
+    color: '#65676b',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  },
+  messageInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    marginLeft: '8px'
+  },
+  messageTime: {
+    fontSize: '11px',
+    color: '#8a8d91',
     marginBottom: '4px'
   },
-  userStatus: {
-    fontSize: '12px',
-    color: '#4caf50'
+  bottomNav: {
+    display: 'flex',
+    borderTop: '1px solid #e4e6eb',
+    backgroundColor: '#ffffff',
+    padding: '8px 0'
+  },
+  navButton: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '8px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    color: '#667eea'
+  },
+  navIcon: {
+    fontSize: '20px'
+  },
+  navLabel: {
+    fontSize: '11px',
+    fontWeight: '500'
   },
   chatArea: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#fff'
-  },
-  chatHeader: {
-    padding: '16px 20px',
-    borderBottom: '1px solid #e0e0e0',
-    backgroundColor: '#fafafa'
-  },
-  chatHeaderUser: {
-    display: 'flex',
-    alignItems: 'center'
-  },
-  chatAvatar: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: '#4caf50',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    fontWeight: '600',
-    marginRight: '12px'
-  },
-  chatUserName: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#333'
-  },
-  chatUserStatus: {
-    fontSize: '12px',
-    color: '#666'
-  },
-  messagesContainer: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '20px',
-    backgroundColor: '#fafafa'
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#999'
-  },
-  emptyChat: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#999'
-  },
-  message: {
-    marginBottom: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    maxWidth: '70%'
-  },
-  messageIncoming: {
-    alignItems: 'flex-start'
-  },
-  messageOutgoing: {
-    alignItems: 'flex-end',
-    alignSelf: 'flex-end'
-  },
-  messageContent: {
-    padding: '12px 16px',
-    borderRadius: '18px',
-    fontSize: '14px',
-    lineHeight: '1.4',
-    wordWrap: 'break-word',
-    backgroundColor: '#e0e0e0',
-    color: '#333'
-  },
-  messageIncomingContent: {
-    backgroundColor: '#e0e0e0',
-    color: '#333'
-  },
-  messageOutgoingContent: {
-    backgroundColor: '#2196f3',
-    color: 'white'
-  },
-  messageTime: {
-    fontSize: '11px',
-    color: '#999',
-    marginTop: '4px',
-    padding: '0 4px'
-  },
-  inputContainer: {
-    display: 'flex',
-    padding: '16px 20px',
-    borderTop: '1px solid #e0e0e0',
-    backgroundColor: '#fff'
-  },
-  messageInput: {
-    flex: 1,
-    padding: '12px 16px',
-    fontSize: '14px',
-    border: '1px solid #e0e0e0',
-    borderRadius: '24px',
-    outline: 'none',
-    marginRight: '12px'
-  },
-  sendButton: {
-    padding: '12px 24px',
-    fontSize: '14px',
-    fontWeight: '600',
-    backgroundColor: '#2196f3',
-    color: 'white',
-    border: 'none',
-    borderRadius: '24px',
-    cursor: 'pointer'
+    backgroundColor: '#ffffff',
+    position: 'relative',
+    borderRadius: '20px',
+    overflow: 'hidden',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    marginRight: '8px'
   },
   noSelection: {
     flex: 1,
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#999',
-    fontSize: '16px'
+    color: '#8a93a2',
+    fontSize: '16px',
+    gap: '24px',
+    padding: '40px'
+  },
+  userInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  currentUserBadge: {
+    fontSize: '14px',
+    color: '#1a1d29',
+    fontWeight: '600',
+    padding: '8px 16px',
+    backgroundColor: '#f5f7fa',
+    borderRadius: '12px'
+  },
+  logoutButton: {
+    padding: '12px 28px',
+    fontSize: '14px',
+    backgroundColor: '#ef4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '16px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.25)'
   }
 };
 
-export default ChatScreen;
-
+export default ChatScreen; 

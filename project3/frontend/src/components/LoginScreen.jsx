@@ -26,11 +26,8 @@ function LoginScreen({ onLogin }) {
       // Use port 3001 to match backend (configurable via third parameter)
       ChatService.init(caPublicKey, govPublicKey, 'http://localhost:3001');
 
-      // Register user with the server
+      // Register user with the server (will wait for connection internally)
       await ChatService.register(username);
-
-      // Wait a bit for socket connection
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Call onLogin callback with username
       onLogin(username);
@@ -44,57 +41,67 @@ function LoginScreen({ onLogin }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.loginBox}>
-        <h1 style={styles.title}>Secure Chat App</h1>
-        <h2 style={styles.subtitle}>Login</h2>
-        
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
-            <label htmlFor="username" style={styles.label}>
-              Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              disabled={loading}
-              style={styles.input}
-              placeholder="Enter your username"
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label htmlFor="password" style={styles.label}>
-              Master Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-              style={styles.input}
-              placeholder="Enter your master password"
-            />
-          </div>
-
-          {error && (
-            <div style={styles.error}>
-              {error}
+      {/* Login Form - Full Width */}
+      <div style={styles.leftPanel}>
+        <div style={styles.formWrapper}>
+          <h1 style={styles.title}>LOGIN</h1>
+          
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <div style={styles.inputGroup}>
+              <span style={styles.icon}>👤</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                disabled={loading}
+                style={styles.input}
+                placeholder="Username"
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={loading ? { ...styles.button, ...styles.buttonDisabled } : styles.button}
-          >
-            {loading ? 'Connecting...' : 'Login'}
+            <div style={styles.inputGroup}>
+              <span style={styles.icon}>🔒</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                style={styles.input}
+                placeholder="Password"
+              />
+            </div>
+
+            {error && (
+              <div style={styles.error}>
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={loading ? { ...styles.button, ...styles.buttonDisabled } : styles.button}
+            >
+              {loading ? 'Connecting...' : 'Login Now'}
+            </button>
+          </form>
+
+          <div style={styles.divider}>
+            <span style={styles.dividerText}>Login with Others</span>
+          </div>
+
+          <button style={styles.socialButton}>
+            <span style={styles.googleIcon}>G</span>
+            Login with <strong>google</strong>
           </button>
-        </form>
+
+          <button style={styles.socialButton}>
+            <span style={styles.facebookIcon}>f</span>
+            Login with <strong>Facebook</strong>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -103,80 +110,139 @@ function LoginScreen({ onLogin }) {
 const styles = {
   container: {
     display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: '20px'
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    margin: 0,
+    padding: 0
   },
-  loginBox: {
-    backgroundColor: 'white',
+  leftPanel: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
     padding: '40px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+    width: '100vw',
+    minHeight: '100vh'
+  },
+  formWrapper: {
     width: '100%',
-    maxWidth: '400px'
+    maxWidth: '450px'
   },
   title: {
-    margin: '0 0 10px 0',
-    fontSize: '28px',
+    fontSize: '36px',
     fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333'
+    margin: '0 0 10px 0',
+    color: '#000'
   },
   subtitle: {
-    margin: '0 0 30px 0',
-    fontSize: '20px',
-    textAlign: 'center',
-    color: '#666'
+    fontSize: '14px',
+    color: '#666',
+    margin: '0 0 40px 0'
   },
   form: {
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    gap: '20px'
   },
-  formGroup: {
-    marginBottom: '20px'
+  inputGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#f3f3f9',
+    borderRadius: '8px',
+    padding: '4px 16px',
+    gap: '12px'
   },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333'
+  icon: {
+    fontSize: '20px',
+    color: '#999'
   },
   input: {
-    width: '100%',
-    padding: '12px',
-    fontSize: '16px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
+    flex: 1,
+    border: 'none',
+    backgroundColor: 'transparent',
+    padding: '14px 0',
+    fontSize: '15px',
+    outline: 'none',
+    color: '#333'
   },
   error: {
     padding: '12px',
-    marginBottom: '20px',
     backgroundColor: '#fee',
     color: '#c33',
-    borderRadius: '4px',
-    fontSize: '14px'
+    borderRadius: '8px',
+    fontSize: '14px',
+    textAlign: 'center'
   },
   button: {
-    padding: '12px',
+    padding: '16px',
     fontSize: '16px',
     fontWeight: '600',
     color: 'white',
-    backgroundColor: '#007bff',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '25px',
     cursor: 'pointer',
-    transition: 'background-color 0.2s'
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+    marginTop: '10px'
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed'
+    background: '#ccc',
+    cursor: 'not-allowed',
+    boxShadow: 'none'
+  },
+  divider: {
+    textAlign: 'center',
+    margin: '30px 0',
+    position: 'relative'
+  },
+  dividerText: {
+    fontSize: '14px',
+    color: '#666',
+    fontWeight: '500'
+  },
+  socialButton: {
+    width: '100%',
+    padding: '14px',
+    fontSize: '15px',
+    color: '#333',
+    backgroundColor: 'white',
+    border: '1px solid #e0e0e0',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    marginBottom: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  },
+  googleIcon: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    backgroundColor: '#4285f4',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold'
+  },
+  facebookIcon: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    backgroundColor: '#1877f2',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    fontWeight: 'bold'
   }
 };
 
 export default LoginScreen;
-
