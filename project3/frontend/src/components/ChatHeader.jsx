@@ -1,4 +1,7 @@
-function ChatHeader({ username }) {
+function ChatHeader({ username, status = 'offline' }) {
+  const isOnline = status === 'online';
+  const statusColor = isOnline ? 'var(--pixel-success)' : 'var(--pixel-secondary)';
+
   return (
     <div style={styles.container}>
       <div style={styles.userInfo}>
@@ -7,7 +10,9 @@ function ChatHeader({ username }) {
         </div>
         <div>
           <div style={styles.userName}>{username}</div>
-          <div style={styles.userStatus}>ONLINE</div>
+          <div style={{ ...styles.userStatus, color: statusColor }}>
+            {status.toUpperCase()}
+          </div>
         </div>
       </div>
       <div style={styles.actions}>

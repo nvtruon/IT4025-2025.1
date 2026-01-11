@@ -13,6 +13,7 @@ function ChatScreen({ username, isAuthenticated, onLogin, onLogout, loading, err
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [errorPopup, setErrorPopup] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Layout State
@@ -208,7 +209,12 @@ function ChatScreen({ username, isAuthenticated, onLogin, onLogout, loading, err
       }]);
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message: ' + error.message);
+      // alert('Failed to send message: ' + error.message);
+      setErrorPopup({
+        title: 'MESSAGE FAILED',
+        message: error.message || 'Could not send message.',
+        isError: true
+      });
       // Restore message text on error
       setNewMessage(messageText);
     }
@@ -278,7 +284,10 @@ function ChatScreen({ username, isAuthenticated, onLogin, onLogout, loading, err
                 </button>
               )}
 
-              <ChatHeader username={selectedUser} />
+              <ChatHeader
+                username={selectedUser}
+                status={users.find(u => u.username === selectedUser)?.status || 'offline'}
+              />
 
               <MessageList
                 messages={messages}
@@ -302,6 +311,23 @@ function ChatScreen({ username, isAuthenticated, onLogin, onLogout, loading, err
           <div style={styles.noSelection}>
             <h3>PLEASE LOGIN</h3>
             <p>ACCESS DENIED</p>
+          </div>
+        )}
+
+        {/* Custom Retro Error Modal */}
+        {errorPopup && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent} className="pixel-border">
+              <h3 style={styles.modalTitle}>{errorPopup.title}</h3>
+              <p style={styles.modalMessage}>{errorPopup.message}</p>
+              <button
+                className="pixel-btn danger"
+                onClick={() => setErrorPopup(null)}
+                style={styles.modalButton}
+              >
+                ACKNOWLEDGE
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -369,6 +395,45 @@ const styles = {
     fontFamily: 'inherit',
     fontSize: '16px',
     cursor: 'pointer',
+    width: '100%'
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    backdropFilter: 'blur(2px)' // Cyber effect
+  },
+  modalContent: {
+    backgroundColor: 'var(--pixel-bg-panel)',
+    padding: '30px',
+    maxWidth: '80%',
+    width: '400px',
+    textAlign: 'center',
+    boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+    border: '4px solid var(--pixel-secondary)' // Red border for error
+  },
+  modalTitle: {
+    color: 'var(--pixel-secondary)',
+    fontSize: '24px',
+    marginTop: 0,
+    marginBottom: '15px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px'
+  },
+  modalMessage: {
+    color: 'var(--pixel-text-main)',
+    fontSize: '18px',
+    marginBottom: '25px',
+    lineHeight: '1.4'
+  },
+  modalButton: {
     width: '100%'
   }
 };
