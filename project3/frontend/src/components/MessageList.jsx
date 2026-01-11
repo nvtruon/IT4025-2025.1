@@ -4,7 +4,7 @@ const MessageList = forwardRef(({ messages, loading, formatTime }, ref) => {
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={styles.loading}>Loading messages...</div>
+        <div style={styles.loading}>LOADING...</div>
       </div>
     );
   }
@@ -13,7 +13,8 @@ const MessageList = forwardRef(({ messages, loading, formatTime }, ref) => {
     return (
       <div style={styles.container}>
         <div style={styles.emptyChat}>
-          <p>No messages yet. Start the conversation!</p>
+          <p>NO MESSAGES.</p>
+          <p>INSERT COIN TO START.</p>
         </div>
       </div>
     );
@@ -31,7 +32,8 @@ const MessageList = forwardRef(({ messages, loading, formatTime }, ref) => {
         >
           <div style={{
             ...styles.messageContent,
-            ...(message.direction === 'outgoing' ? styles.messageOutgoingContent : styles.messageIncomingContent)
+            ...(message.direction === 'outgoing' ? styles.messageOutgoingContent : styles.messageIncomingContent),
+            ...(message.isError ? styles.messageErrorContent : {})
           }}>
             {message.text}
           </div>
@@ -40,7 +42,6 @@ const MessageList = forwardRef(({ messages, loading, formatTime }, ref) => {
           </div>
         </div>
       ))}
-      <div style={styles.todayDivider}>Today</div>
       <div ref={ref} />
     </div>
   );
@@ -52,26 +53,30 @@ const styles = {
   container: {
     flex: 1,
     overflowY: 'auto',
-    padding: '28px 32px',
-    backgroundColor: '#f5f7fa',
-    position: 'relative'
+    padding: '20px',
+    backgroundColor: '#222034', // var(--pixel-bg-dark)
+    position: 'relative',
+    backgroundImage: 'radial-gradient(#333 1px, transparent 1px)',
+    backgroundSize: '20px 20px'
   },
   loading: {
     textAlign: 'center',
     padding: '20px',
-    color: '#65676b'
+    color: '#fff',
+    fontFamily: '"VT323", monospace',
+    fontSize: '24px'
   },
   emptyChat: {
     textAlign: 'center',
     padding: '40px',
-    color: '#65676b'
+    color: '#8f9799',
+    fontSize: '20px'
   },
   message: {
-    marginBottom: '12px',
+    marginBottom: '20px',
     display: 'flex',
     flexDirection: 'column',
-    maxWidth: '70%',
-    animation: 'fadeIn 0.3s ease-in'
+    maxWidth: '80%',
   },
   messageIncoming: {
     alignItems: 'flex-start',
@@ -83,37 +88,35 @@ const styles = {
     marginLeft: 'auto'
   },
   messageContent: {
-    padding: '12px 16px',
-    borderRadius: '20px',
-    fontSize: '14px',
-    lineHeight: '1.5',
+    padding: '15px',
+    fontSize: '18px',
+    lineHeight: '1.4',
     wordWrap: 'break-word',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+    border: '4px solid #000',
+    boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)',
+    position: 'relative'
   },
   messageIncomingContent: {
-    backgroundColor: '#ffffff',
-    color: '#1a1d29',
-    borderBottomLeftRadius: '6px',
-    border: '1px solid #e8ecf1'
+    backgroundColor: '#fff',
+    color: '#000',
   },
   messageOutgoingContent: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    borderBottomRightRadius: '6px',
-    marginRight: '8px'
+    backgroundColor: '#66ccff',
+    color: '#000',
+  },
+  messageErrorContent: {
+    backgroundColor: '#ac3232', // Red
+    color: '#fff',
+    border: '4px solid #fbf236' // Yellow warning border
   },
   messageTime: {
-    fontSize: '11px',
-    color: '#8a8d91',
-    marginTop: '4px',
-    padding: '0 4px'
-  },
-  todayDivider: {
-    textAlign: 'center',
     fontSize: '12px',
-    color: '#8a8d91',
-    margin: '16px 0',
-    position: 'relative'
+    color: '#8f9799',
+    marginTop: '6px',
+    padding: '0 4px',
+    fontFamily: '"Arial", sans-serif', // Readable font
+    fontWeight: 'bold',
+    opacity: 0.8
   }
 };
 

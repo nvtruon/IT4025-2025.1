@@ -3,9 +3,9 @@ function UserList({ users, selectedUser, onSelectUser, onRefresh }) {
     <div style={styles.container}>
       {users.length === 0 ? (
         <div style={styles.emptyState}>
-          <p>No other users online</p>
-          <button onClick={onRefresh} style={styles.refreshButton}>
-            Refresh
+          <p>NO SIGNAL...</p>
+          <button onClick={onRefresh} className="pixel-btn">
+            SCAN
           </button>
         </div>
       ) : (
@@ -22,11 +22,12 @@ function UserList({ users, selectedUser, onSelectUser, onRefresh }) {
               {user.username.charAt(0).toUpperCase()}
             </div>
             <div style={styles.userDetails}>
-              <div style={styles.userName}>{user.username}</div>
-              <div style={styles.lastMessage}>Click to start chatting...</div>
-            </div>
-            <div style={styles.messageInfo}>
-              <div style={styles.messageTime}>4:30 PM</div>
+              <div style={styles.userName}>
+                {user.username}
+                {user.status === 'offline' && <span style={styles.offlineTag}> [OFF]</span>}
+                {user.status === 'online' && <span style={styles.onlineTag}> [ON]</span>}
+              </div>
+              <div style={styles.lastMessage}>PRESS START</div>
             </div>
           </div>
         ))
@@ -39,84 +40,70 @@ const styles = {
   container: {
     flex: 1,
     overflowY: 'auto',
-    backgroundColor: '#fafbfc'
+    backgroundColor: '#222034', // Dark bg
+    padding: '10px'
   },
   emptyState: {
     padding: '20px',
     textAlign: 'center',
-    color: '#65676b'
-  },
-  refreshButton: {
-    marginTop: '10px',
-    padding: '8px 16px',
-    backgroundColor: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600'
+    color: '#8f9799'
   },
   userItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '16px 20px',
+    padding: '10px',
     cursor: 'pointer',
-    transition: 'all 0.2s',
-    backgroundColor: '#ffffff',
-    borderBottom: '1px solid #f0f2f5',
-    margin: '4px 8px',
-    borderRadius: '16px'
+    transition: 'all 0.1s',
+    backgroundColor: '#45283c',
+    marginBottom: '10px',
+    border: '4px solid #000', // Pixel border
+    boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)',
+    color: '#fff'
   },
   userItemSelected: {
-    backgroundColor: '#eef2ff',
-    borderLeft: '4px solid #667eea',
-    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.15)'
+    backgroundColor: '#76428a',
+    transform: 'translate(2px, 2px)',
+    boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)'
   },
   userAvatar: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
+    width: '40px',
+    height: '40px',
+    backgroundColor: '#df7126', // Orange
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '20px',
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginRight: '12px',
-    flexShrink: 0
+    flexShrink: 0,
+    border: '2px solid #000'
   },
   userDetails: {
     flex: 1,
     minWidth: 0
   },
   userName: {
-    fontSize: '15px',
+    fontSize: '18px',
     fontWeight: '600',
-    color: '#050505',
+    color: '#fff',
     marginBottom: '4px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    textTransform: 'uppercase'
   },
   lastMessage: {
-    fontSize: '13px',
-    color: '#65676b',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    fontSize: '14px',
+    color: '#8f9799',
+    textTransform: 'uppercase'
   },
-  messageInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    marginLeft: '8px'
+  onlineTag: {
+    color: '#99e550',
+    fontSize: '16px',
+    marginLeft: '4px'
   },
-  messageTime: {
-    fontSize: '11px',
-    color: '#8a8d91',
-    marginBottom: '4px'
+  offlineTag: {
+    color: '#ac3232',
+    fontSize: '16px',
+    marginLeft: '4px'
   }
 };
 

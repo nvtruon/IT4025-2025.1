@@ -4,35 +4,49 @@ class StorageService {
   constructor() {
     this.keychain = null;
     this.initialized = false;
+    this.currentUser = null;
   }
 
   /**
-   * Initialize the storage service with a master password
-   * Generates the Master Key using Keychain
+   * Initialize the storage service for a specific user.
+   * - If user exists: Attempt Login (load keychain).
+   * - If user new: Attempt Register (create keychain).
+   * @param {string} username - Username
    * @param {string} password - Master password
-   * @returns {Promise<void>}
    */
-  async init(password) {
+  async init(username, password) {
+    if (!username || typeof username !== 'string') {
+      throw new Error('Username must be a non-empty string');
+    }
     if (!password || typeof password !== 'string' || password.length === 0) {
       throw new Error('Password must be a non-empty string');
     }
 
-    // Try to load existing keychain from localStorage
-    const storedKeychain = localStorage.getItem('keychain_data');
-    const storedDigest = localStorage.getItem('keychain_digest');
+    this.currentUser = username;
+
+    // Namespace keys by username
+    const dataKey = `keychain_data_${username}`;
+    const digestKey = `keychain_digest_${username}`;
+
+    const storedKeychain = localStorage.getItem(dataKey);
+    const storedDigest = localStorage.getItem(digestKey);
 
     if (storedKeychain && storedDigest) {
+      // --- EXISTING USER: LOGIN ---
+      console.log(`Attempting login for existing user: ${username}`);
       try {
-        // Load existing keychain
+        // Load existing keychain - this will THROW if password is wrong
         this.keychain = await Keychain.load(password, storedKeychain, storedDigest);
       } catch (error) {
-        // If loading fails (wrong password), create a new one
-        console.warn('Failed to load existing keychain, creating new one:', error.message);
-        this.keychain = await Keychain.init(password);
-        await this._saveKeychain();
+        console.error('Failed to load keychain:', error);
+        if (error.message === 'Incorrect password' || error.message.includes('Integrity check failed')) {
+          throw new Error('Incorrect password');
+        }
+        throw error;
       }
     } else {
-      // Create new keychain
+      // --- NEW USER: REGISTER ---
+      console.log(`Creating new account for: ${username}`);
       this.keychain = await Keychain.init(password);
       await this._saveKeychain();
     }
@@ -41,13 +55,54 @@ class StorageService {
   }
 
   /**
-   * Save keychain to localStorage
+   * Save keychain to localStorage (namespaced)
    * @private
    */
   async _saveKeychain() {
+    if (!this.keychain || !this.currentUser) return;
     const [repr, digest] = await this.keychain.dump();
-    localStorage.setItem('keychain_data', repr);
-    localStorage.setItem('keychain_digest', digest);
+
+    const dataKey = `keychain_data_${this.currentUser}`;
+    const digestKey = `keychain_digest_${this.currentUser}`;
+
+    localStorage.setItem(dataKey, repr);
+    localStorage.setItem(digestKey, digest);
+  }
+
+  /**
+   * Get list of all peers we have chatted with
+   * @returns {Promise<string[]>} List of usernames
+   */
+  async getKnownPeers() {
+    if (!this.initialized || !this.keychain) {
+      return [];
+    }
+    try {
+      const peersJson = await this.keychain.get('known_peers');
+      if (peersJson) {
+        return JSON.parse(peersJson);
+      }
+    } catch (e) {
+      console.warn('Failed to load known peers', e);
+    }
+    return [];
+  }
+
+  /**
+   * Add a peer to the known peers list
+   * @private
+   */
+  async _addKnownPeer(peerName) {
+    try {
+      const peers = await this.getKnownPeers();
+      if (!peers.includes(peerName)) {
+        peers.push(peerName);
+        peers.sort(); // Keep sorted
+        await this.keychain.set('known_peers', JSON.stringify(peers));
+      }
+    } catch (e) {
+      console.error('Failed to update known peers:', e);
+    }
   }
 
   /**
@@ -85,6 +140,10 @@ class StorageService {
 
     // Encrypt and save the updated history
     await this.keychain.set(`peer_${peerName}`, JSON.stringify(history));
+
+    // Track this peer as known
+    await this._addKnownPeer(peerName);
+
     await this._saveKeychain();
   }
 
@@ -112,6 +171,30 @@ class StorageService {
       console.error(`Error loading history for ${peerName}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Save Messenger state (including keys) to encrypted storage
+   * @param {string} state - Serialized messenger state (JSON string)
+   * @returns {Promise<void>}
+   */
+  async saveMessengerState(state) {
+    if (!this.initialized || !this.keychain) {
+      throw new Error('StorageService not initialized');
+    }
+    await this.keychain.set('messenger_state', state);
+    await this._saveKeychain();
+  }
+
+  /**
+   * Load Messenger state from encrypted storage
+   * @returns {Promise<string|null>} Serialized messenger state or null
+   */
+  async loadMessengerState() {
+    if (!this.initialized || !this.keychain) {
+      throw new Error('StorageService not initialized');
+    }
+    return await this.keychain.get('messenger_state');
   }
 
   /**

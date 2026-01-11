@@ -7,13 +7,10 @@ function ChatHeader({ username }) {
         </div>
         <div>
           <div style={styles.userName}>{username}</div>
-          <div style={styles.userStatus}>Online</div>
+          <div style={styles.userStatus}>ONLINE</div>
         </div>
       </div>
       <div style={styles.actions}>
-        <button style={styles.iconButton}>📞</button>
-        <button style={styles.iconButton}>📹</button>
-        <button style={styles.iconButton}>ℹ️</button>
       </div>
     </div>
   );
@@ -24,57 +21,47 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '20px 28px',
-    borderBottom: '2px solid #e8ecf1',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-    minHeight: '76px',
-    zIndex: 10,
-    borderRadius: '20px 20px 0 0'
+    padding: '15px 20px',
+    backgroundColor: 'transparent', // Transparent to show main bg
+    borderBottom: '4px solid #000',
+    minHeight: '80px',
+    zIndex: 10
   },
   userInfo: {
     display: 'flex',
     alignItems: 'center'
   },
   avatar: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
+    width: '48px',
+    height: '48px',
+    backgroundColor: '#76428a',
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '16px',
-    fontWeight: '600',
-    marginRight: '12px'
+    fontSize: '24px',
+    fontWeight: 'bold',
+    marginRight: '15px',
+    border: '4px solid #000',
+    boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)'
   },
   userName: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#050505',
-    marginBottom: '2px'
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#fff', // White text
+    textTransform: 'uppercase',
+    textShadow: '2px 2px #000',
+    lineHeight: '1'
   },
   userStatus: {
-    fontSize: '12px',
-    color: '#65676b'
+    fontSize: '16px',
+    color: '#99e550', // Green
+    textTransform: 'uppercase',
+    marginTop: '4px'
   },
   actions: {
     display: 'flex',
     gap: '8px'
-  },
-  iconButton: {
-    width: '36px',
-    height: '36px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    fontSize: '18px',
-    cursor: 'pointer',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'background-color 0.2s'
   }
 };
 

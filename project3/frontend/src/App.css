@@ -1,56 +1,111 @@
+/* Retro Pixel Theme */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+:root {
+  --pixel-bg-dark: #222034;
+  --pixel-bg-light: #45283c;
+  --pixel-accent: #66ccff;
+  --pixel-accent-hover: #3399cc;
+  --pixel-text: #ffffff;
+  --pixel-text-dim: #8f9799;
+  --pixel-success: #99e550;
+  --pixel-error: #ac3232;
+  --pixel-warning: #fbf236;
+  --pixel-border: #000000;
+
+  --shadow-1: 4px 4px 0px 0px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--pixel-bg-dark);
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  /* Larger base size for pixel font */
+  color: var(--pixel-text);
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+}
+
 .App {
   width: 100vw;
   height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-#root {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
+  display: flex;
   overflow: hidden;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Pixel Art Utilities */
+.pixel-border {
+  border: 4px solid var(--pixel-border);
+  box-shadow: var(--shadow-1);
+  background: var(--pixel-bg-light);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.pixel-btn {
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  background: var(--pixel-accent);
+  color: #000;
+  border: 4px solid var(--pixel-border);
+  padding: 10px 20px;
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  text-transform: uppercase;
+  transition: transform 0.1s;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px 0px rgba(0, 0, 0, 0.5);
 }
 
-.card {
-  padding: 2em;
+.pixel-btn.secondary {
+  background: #76428a;
+  color: #fff;
 }
 
-.read-the-docs {
-  color: #888;
+.pixel-btn.danger {
+  background: var(--pixel-error);
+  color: #fff;
+}
+
+.pixel-input {
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  padding: 10px;
+  border: 4px solid var(--pixel-border);
+  background: #fff;
+  color: #000;
+  box-shadow: inset 4px 4px 0px 0px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+.pixel-input:focus {
+  outline: none;
+  background: #f0f0f0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--pixel-bg-dark);
+  border-left: 2px solid var(--pixel-border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pixel-accent);
+  border: 2px solid var(--pixel-border);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pixel-accent-hover);
 }

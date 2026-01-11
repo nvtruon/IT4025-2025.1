@@ -88,7 +88,7 @@ class ChatService {
         for (const user of data.users) {
           // Skip current user
           if (this.currentUser && user.username === this.currentUser) continue;
-          
+
           try {
             // The server sends { username, publicKey }
             // We construct the certificate object as expected by Messenger
@@ -96,7 +96,7 @@ class ChatService {
               username: user.username,
               publicKey: user.publicKey
             };
-            
+
             // Pass null for signature since server doesn't provide it
             await this.receiveCertificate(certificate, null);
             console.log(`Received certificate for ${user.username}`);
@@ -148,17 +148,80 @@ class ChatService {
       await this.waitForConnection();
     }
 
+    // 1. Try to restore session from storage (Persistence Fix)
+    if (StorageService.isInitialized()) {
+      const storedState = await StorageService.loadMessengerState();
+      if (storedState) {
+        try {
+          const restoredMessenger = await Messenger.deserialize(
+            storedState,
+            this.messenger.caPublicKey,
+            this.messenger.govPublicKey
+          );
+
+          if (restoredMessenger.username === username) {
+            console.log('Restored previous session for', username);
+            this.messenger = restoredMessenger;
+            this.currentUser = username;
+
+            const pubKeyJson = await cryptoKeyToJSON(this.messenger.EGKeyPair.pub);
+            this.socket.emit('register', {
+              username: username,
+              publicKey: pubKeyJson
+            });
+            return { username, publicKey: pubKeyJson };
+          }
+        } catch (e) {
+          console.warn('Failed to restore session:', e);
+        }
+      }
+    }
+
+    // 2. Start fresh if no session
     // Generate certificate
     const certificate = await this.messenger.generateCertificate(username);
     this.currentUser = username;
 
-    // Register with server
-    this.socket.emit('register', {
-      username: username,
-      publicKey: certificate.publicKey
-    });
+    // Save state
+    if (StorageService.isInitialized()) {
+      try {
+        await StorageService.saveMessengerState(await this.messenger.serialize());
+      } catch (e) { console.error("Saving state failed", e); }
+    }
 
-    return certificate;
+    // Register with server and wait for response
+    return new Promise((resolve, reject) => {
+      const onSuccess = () => {
+        cleanup();
+        resolve(certificate);
+      };
+
+      const onError = (err) => {
+        cleanup();
+        reject(new Error(err.message || 'Registration failed'));
+      };
+
+      const cleanup = () => {
+        this.socket.off('register_success', onSuccess);
+        this.socket.off('error', onError);
+      };
+
+      this.socket.on('register_success', onSuccess);
+      this.socket.on('error', onError);
+
+      this.socket.emit('register', {
+        username: username,
+        publicKey: certificate.publicKey
+      });
+
+      // Timeout if no response
+      setTimeout(() => {
+        cleanup();
+        // Don't reject, just resolve (optimistic) or reject?
+        // If server is strict, we should reject.
+        reject(new Error('Registration timed out'));
+      }, 5000);
+    });
   }
 
   /**
@@ -219,9 +282,14 @@ class ChatService {
     // Encrypt message using Messenger (Double Ratchet)
     const [header, ciphertext] = await this.messenger.sendMessage(recipient, text);
 
+    // Save ratchet state
+    if (StorageService.isInitialized()) {
+      await StorageService.saveMessengerState(await this.messenger.serialize());
+    }
+
     // Convert header for transmission (vGov is a CryptoKey, needs to be serialized)
     const vGovJWK = await cryptoKeyToJSON(header.vGov);
-    
+
     const headerForTransmission = {
       receiverIV: this._arrayBufferToBase64(header.receiverIV),
       vGov: vGovJWK, // Serialized as JWK
@@ -268,10 +336,13 @@ class ChatService {
     }
 
     const { sender, payload } = data;
+    console.log(`[DEBUG] Received raw message from ${sender}`, payload);
 
     try {
       // Convert header back - vGov needs to be imported as CryptoKey
       const { subtle } = window.crypto;
+
+      console.log('[DEBUG] Importing vGov key...');
       const vGovKey = await subtle.importKey(
         'jwk',
         payload.header.vGov,
@@ -288,10 +359,18 @@ class ChatService {
         messageNumber: payload.header.messageNumber,
         prevChainLength: payload.header.prevChainLength
       };
+
+      console.log('[DEBUG] Header reconstructed. Decrypting with Messenger...');
       const ciphertext = this._base64ToArrayBuffer(payload.ciphertext);
 
       // Decrypt message using Messenger
       const plaintext = await this.messenger.receiveMessage(sender, [header, ciphertext]);
+      console.log(`[DEBUG] Decryption successful: "${plaintext}"`);
+
+      // Save ratchet state
+      if (StorageService.isInitialized()) {
+        await StorageService.saveMessengerState(await this.messenger.serialize());
+      }
 
       // Save message locally
       if (StorageService.isInitialized()) {
@@ -326,7 +405,7 @@ class ChatService {
         try {
           handler({
             sender: sender,
-            error: error.message,
+            error: error.message || 'Decryption failed',
             timestamp: Date.now()
           });
         } catch (handlerError) {
@@ -415,4 +494,4 @@ class ChatService {
 // Export singleton instance
 export default new ChatService();
 
-// Fixed usages
+

@@ -1,32 +1,107 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ChatService from '../services/ChatService.js';
 import StorageService from '../services/StorageService.js';
 import UserList from './UserList.jsx';
 import ChatHeader from './ChatHeader.jsx';
 import MessageList from './MessageList.jsx';
 import MessageInput from './MessageInput.jsx';
-import BottomNav from './BottomNav.jsx';
+import LoginPanel from './LoginPanel.jsx';
 
-function ChatScreen({ username, onLogout }) {
+function ChatScreen({ username, isAuthenticated, onLogin, onLogout, loading, error }) {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Layout State
+  // Layout State
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showSidebar, setShowSidebar] = useState(true);
+
+  // Resize Handlers
+  const startResizing = useCallback(() => setIsDragging(true), []);
+  const stopResizing = useCallback(() => setIsDragging(false), []);
+
+  const resize = useCallback((mouseEvent) => {
+    if (isDragging) {
+      const newWidth = mouseEvent.clientX;
+      if (newWidth > 240 && newWidth < 500) {
+        setSidebarWidth(newWidth);
+      }
+    }
+  }, [isDragging]);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stopResizing);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) setShowSidebar(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [resize, stopResizing]);
 
   // Load users list on mount and listen for updates
   useEffect(() => {
-    // Get initial users list
-    ChatService.getUsers();
-    
+    if (!isAuthenticated) return;
+
+    const fetchUsers = async () => {
+      // 1. Get known peers from local storage
+      const knownPeers = await StorageService.getKnownPeers();
+
+      setUsers(currentUsers => {
+        // Map known peers to user objects (initially offline)
+        const offlineUsers = knownPeers
+          .filter(peer => peer !== username)
+          .map(peer => ({ username: peer, status: 'offline' }));
+
+        // If we already have online users, merge them
+        const onlineUsernames = new Set(currentUsers.filter(u => u.status !== 'offline').map(u => u.username));
+
+        // Return unique list, preferring online status
+        const merged = [...currentUsers.filter(u => u.status !== 'offline')];
+        offlineUsers.forEach(u => {
+          if (!onlineUsernames.has(u.username)) {
+            merged.push(u);
+          }
+        });
+        return merged;
+      });
+
+      ChatService.getUsers();
+    };
+
+    fetchUsers();
+
     // Set up socket listener for users_list event
     const socket = ChatService.getSocket();
     if (socket) {
-      const handleUsersList = (data) => {
-        // Filter out current user from the list
-        const otherUsers = (data.users || []).filter(user => user.username !== username);
-        setUsers(otherUsers);
+      const handleUsersList = async (data) => {
+        const onlineUsersList = (data.users || []).filter(user => user.username !== username);
+        const onlineUsernames = new Set(onlineUsersList.map(u => u.username));
+
+        // Get known peers again to ensure we have the latest
+        const knownPeers = await StorageService.getKnownPeers();
+
+        // Construct final list: Online users + Known (Offline) users
+        const finalUsers = [...onlineUsersList.map(u => ({ ...u, status: 'online' }))];
+
+        knownPeers.forEach(peer => {
+          if (peer !== username && !onlineUsernames.has(peer)) {
+            finalUsers.push({ username: peer, status: 'offline' });
+          }
+        });
+
+        setUsers(finalUsers);
       };
 
       socket.on('users_list', handleUsersList);
@@ -41,13 +116,24 @@ function ChatScreen({ username, onLogout }) {
         clearInterval(interval);
       };
     }
-  }, [username]);
+  }, [username, isAuthenticated]);
 
   // Set up message handler
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const handleMessage = (messageData) => {
       if (messageData.error) {
         console.error('Message error:', messageData.error);
+        if (selectedUser && messageData.sender === selectedUser) {
+          setMessages(prev => [...prev, {
+            text: '⚠️ Decryption Failed: ' + (messageData.error || 'Unknown error'),
+            sender: messageData.sender,
+            timestamp: messageData.timestamp,
+            direction: 'incoming',
+            isError: true
+          }]);
+        }
         return;
       }
 
@@ -60,6 +146,9 @@ function ChatScreen({ username, onLogout }) {
           direction: 'incoming'
         }]);
       }
+
+      // Refresh user list to insure new peer appears in list
+      ChatService.getUsers();
     };
 
     const unregister = ChatService.onReceive(handleMessage);
@@ -67,14 +156,16 @@ function ChatScreen({ username, onLogout }) {
     return () => {
       unregister();
     };
-  }, [selectedUser]);
+  }, [selectedUser, isAuthenticated]);
 
   // Load chat history when user is selected
   useEffect(() => {
-    if (selectedUser) {
+    if (selectedUser && isAuthenticated) {
       loadChatHistory(selectedUser);
+      // On mobile, hide sidebar when a user is selected
+      if (isMobile) setShowSidebar(false);
     }
-  }, [selectedUser]);
+  }, [selectedUser, isAuthenticated, isMobile]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -83,14 +174,14 @@ function ChatScreen({ username, onLogout }) {
 
   const loadChatHistory = async (peerName) => {
     try {
-      setLoading(true);
+      setChatLoading(true);
       const history = await StorageService.loadHistory(peerName);
       setMessages(history || []);
     } catch (error) {
       console.error('Error loading chat history:', error);
       setMessages([]);
     } finally {
-      setLoading(false);
+      setChatLoading(false);
     }
   };
 
@@ -107,7 +198,7 @@ function ChatScreen({ username, onLogout }) {
 
     try {
       await ChatService.sendSecure(messageText, selectedUser);
-      
+
       // Add message to UI immediately (it will also be saved by ChatService)
       setMessages(prev => [...prev, {
         text: messageText,
@@ -130,51 +221,87 @@ function ChatScreen({ username, onLogout }) {
 
   return (
     <div style={styles.container}>
-      {/* Left Sidebar - Chats List */}
-      <div style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <h2 style={styles.sidebarTitle}>Chats</h2>
-          <button style={styles.menuButton}>⋮</button>
-        </div>
-        
-        <UserList
-          users={users}
-          selectedUser={selectedUser}
-          onSelectUser={setSelectedUser}
-          onRefresh={() => ChatService.getUsers()}
-        />
+      {/* Sidebar Panel */}
+      <div style={{
+        ...styles.sidebar,
+        width: isMobile ? '100%' : `${sidebarWidth}px`,
+        display: (isMobile && !showSidebar) ? 'none' : 'flex'
+      }} className="pixel-border">
 
-        <BottomNav />
+        <div>
+          <LoginPanel
+            isAuthenticated={isAuthenticated}
+            username={username}
+            onLogin={onLogin}
+            onLogout={onLogout}
+            loading={loading}
+            error={error}
+          />
+        </div>
+
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {isAuthenticated ? (
+            <UserList
+              users={users}
+              selectedUser={selectedUser}
+              onSelectUser={setSelectedUser}
+              onRefresh={() => ChatService.getUsers()}
+            />
+          ) : (
+            <div style={styles.emptyState}>
+              <p>LOGIN REQUIRED</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Right Side - Chat Window */}
-      <div style={styles.chatArea}>
-        {selectedUser ? (
-          <>
-            <ChatHeader username={selectedUser} />
+      {/* Resizer Handle (Desktop Only) */}
+      {!isMobile && (
+        <div
+          onMouseDown={startResizing}
+          style={styles.resizer}
+        />
+      )}
 
-            <MessageList
-              messages={messages}
-              loading={loading}
-              formatTime={formatTime}
-              ref={messagesEndRef}
-            />
+      {/* Main Chat Area */}
+      <div style={{
+        ...styles.chatArea,
+        display: (isMobile && showSidebar) ? 'none' : 'flex'
+      }} className="pixel-border">
+        {isAuthenticated ? (
+          selectedUser ? (
+            <>
+              {/* Mobile Back Button */}
+              {isMobile && (
+                <button style={styles.backButton} onClick={() => setShowSidebar(true)}>
+                  &lt; BACK
+                </button>
+              )}
 
-            <MessageInput
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onSubmit={handleSendMessage}
-            />
-          </>
+              <ChatHeader username={selectedUser} />
+
+              <MessageList
+                messages={messages}
+                loading={chatLoading}
+                formatTime={formatTime}
+                ref={messagesEndRef}
+              />
+
+              <MessageInput
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onSubmit={handleSendMessage}
+              />
+            </>
+          ) : (
+            <div style={styles.noSelection}>
+              <p>&lt;&lt; SELECT USER</p>
+            </div>
+          )
         ) : (
           <div style={styles.noSelection}>
-            <p>Select a user from the sidebar to start chatting</p>
-            <div style={styles.userInfo}>
-              <span style={styles.currentUserBadge}>Logged in as: {username}</span>
-              <button onClick={onLogout} style={styles.logoutButton}>
-                Logout
-              </button>
-            </div>
+            <h3>PLEASE LOGIN</h3>
+            <p>ACCESS DENIED</p>
           </div>
         )}
       </div>
@@ -187,167 +314,34 @@ const styles = {
     display: 'flex',
     height: '100vh',
     width: '100vw',
-    margin: 0,
-    backgroundColor: '#f5f7fa',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    overflow: 'hidden',
-    gap: '16px',
-    padding: '0 8px 0 0'
+    backgroundColor: '#222034', // var(--pixel-bg-dark)
+    padding: '10px',
+    gap: '0'
   },
   sidebar: {
-    width: '500px',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#45283c', // var(--pixel-bg-light)
     display: 'flex',
     flexDirection: 'column',
-    borderRight: 'none',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-    borderRadius: '20px',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    position: 'relative'
   },
-  sidebarHeader: {
-    padding: '24px 24px',
-    borderBottom: '2px solid #e8ecf1',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    minHeight: '76p20px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    borderRadius: '0 20px 0 0'
-  },
-  sidebarTitle: {
-    margin: 0,
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#1a1d29',
-    letterSpacing: '-0.5px'
-  },
-  menuButton: {
-    width: '40px',
-    height: '40px',
-    border: 'none',
-    backgroundColor: '#f5f7fa',
-    fontSize: '20px',
-    cursor: 'pointer',
-    borderRadius: '50%',
+  resizer: {
+    width: '10px',
+    cursor: 'col-resize',
+    backgroundColor: '#222034',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#5b6b7c',
-    transition: 'all 0.2s'
-  },
-  userList: {
-    flex: 1,
-    overflowY: 'auto',
-    backgroundColor: '#ffffff'
-  },
-  emptyState: {
-    padding: '20px',
-    textAlign: 'center',
-    color: '#65676b'
-  },
-  refreshButton: {
-    marginTop: '10px',
-    padding: '8px 16px',
-    backgroundColor: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600'
-  },
-  userItem: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 16px',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    backgroundColor: '#ffffff'
-  },
-  userItemSelected: {
-    backgroundColor: '#e7f3ff'
-  },
-  userAvatar: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '20px',
-    fontWeight: '600',
-    marginRight: '12px',
-    flexShrink: 0
-  },
-  userDetails: {
-    flex: 1,
-    minWidth: 0
-  },
-  userName: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#050505',
-    marginBottom: '4px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  lastMessage: {
-    fontSize: '13px',
-    color: '#65676b',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
-  },
-  messageInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    marginLeft: '8px'
-  },
-  messageTime: {
-    fontSize: '11px',
-    color: '#8a8d91',
-    marginBottom: '4px'
-  },
-  bottomNav: {
-    display: 'flex',
-    borderTop: '1px solid #e4e6eb',
-    backgroundColor: '#ffffff',
-    padding: '8px 0'
-  },
-  navButton: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '8px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    color: '#667eea'
-  },
-  navIcon: {
-    fontSize: '20px'
-  },
-  navLabel: {
-    fontSize: '11px',
-    fontWeight: '500'
+    position: 'relative',
+    zIndex: 10
   },
   chatArea: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#ffffff',
-    position: 'relative',
-    borderRadius: '20px',
+    backgroundColor: '#222034',
     overflow: 'hidden',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-    marginRight: '8px'
+    position: 'relative'
   },
   noSelection: {
     flex: 1,
@@ -355,37 +349,28 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#8a93a2',
-    fontSize: '16px',
+    color: '#8f9799', // var(--pixel-text-dim)
+    fontSize: '24px',
     gap: '24px',
-    padding: '40px'
+    textTransform: 'uppercase'
   },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '12px'
+  emptyState: {
+    padding: '20px',
+    textAlign: 'center',
+    color: '#8f9799',
+    marginTop: 'auto',
+    marginBottom: 'auto'
   },
-  currentUserBadge: {
-    fontSize: '14px',
-    color: '#1a1d29',
-    fontWeight: '600',
-    padding: '8px 16px',
-    backgroundColor: '#f5f7fa',
-    borderRadius: '12px'
-  },
-  logoutButton: {
-    padding: '12px 28px',
-    fontSize: '14px',
-    backgroundColor: '#ef4444',
+  backButton: {
+    padding: '10px',
+    background: '#ac3232', // red
     color: 'white',
     border: 'none',
-    borderRadius: '16px',
+    fontFamily: 'inherit',
+    fontSize: '16px',
     cursor: 'pointer',
-    fontWeight: '600',
-    transition: 'all 0.2s',
-    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.25)'
+    width: '100%'
   }
 };
 
-export default ChatScreen; 
+export default ChatScreen;

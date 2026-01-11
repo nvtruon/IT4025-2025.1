@@ -31,9 +31,15 @@ io.on('connection', (socket) => {
   // Register user with public key
   socket.on('register', (data) => {
     const { username, publicKey } = data;
-    
+
     if (!username || !publicKey) {
       socket.emit('error', { message: 'Username and publicKey are required' });
+      return;
+    }
+
+    // Check if username is already taken
+    if (users.has(username)) {
+      socket.emit('error', { message: `Username '${username}' is already taken by another active user.` });
       return;
     }
 
@@ -42,11 +48,18 @@ io.on('connection', (socket) => {
       publicKey: publicKey,
       socketId: socket.id
     });
-    
+
     socketToUser.set(socket.id, username);
-    
+
     console.log(`User registered: ${username}`);
     socket.emit('register_success', { message: 'Registration successful' });
+
+    // Broadcast updated user list to all clients
+    const userList = Array.from(users.entries()).map(([u, d]) => ({
+      username: u,
+      publicKey: d.publicKey
+    }));
+    io.emit('users_list', { users: userList });
   });
 
   // Get list of all users
@@ -55,14 +68,14 @@ io.on('connection', (socket) => {
       username: username,
       publicKey: data.publicKey
     }));
-    
+
     socket.emit('users_list', { users: userList });
   });
 
   // Send message (forward encrypted payload to recipient)
   socket.on('send_message', (data) => {
     const { recipient, payload } = data;
-    
+
     if (!recipient || !payload) {
       socket.emit('error', { message: 'Recipient and payload are required' });
       return;
@@ -97,6 +110,13 @@ io.on('connection', (socket) => {
       users.delete(username);
       socketToUser.delete(socket.id);
       console.log(`User disconnected: ${username}`);
+
+      // Broadcast updated user list to all clients
+      const userList = Array.from(users.entries()).map(([u, d]) => ({
+        username: u,
+        publicKey: d.publicKey
+      }));
+      io.emit('users_list', { users: userList });
     } else {
       console.log(`Client disconnected: ${socket.id}`);
     }
