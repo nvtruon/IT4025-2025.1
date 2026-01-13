@@ -73,8 +73,10 @@ io.on('connection', (socket) => {
       socket.emit('register_success', { message: 'Registration successful' });
 
       // 3. Broadcast updated user list
-      const users = await User.find({}, 'username publicKey');
-      io.emit('users_list', { users });
+      const allUsers = await User.find({}, 'username publicKey');
+      const onlineUsernames = new Set(socketToUser.values());
+      const onlineUsers = allUsers.filter(u => onlineUsernames.has(u.username));
+      io.emit('users_list', { users: onlineUsers });
 
       // 4. [ZK Message Sync] Check for pending messages
       const pendingMessages = await Message.find({
@@ -103,8 +105,10 @@ io.on('connection', (socket) => {
   // Get list of all users
   socket.on('get_users', async () => {
     try {
-      const users = await User.find({}, 'username publicKey');
-      socket.emit('users_list', { users });
+      const allUsers = await User.find({}, 'username publicKey');
+      const onlineUsernames = new Set(socketToUser.values());
+      const onlineUsers = allUsers.filter(u => onlineUsernames.has(u.username));
+      socket.emit('users_list', { users: onlineUsers });
     } catch (err) {
       console.error('Get users error:', err);
     }

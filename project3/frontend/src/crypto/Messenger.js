@@ -94,7 +94,7 @@ export class Messenger {
 
       messenger.EGKeyPair = {
         pub: await importK(data.EGKeyPair.pub, 'ECDH', []),
-        sec: await importK(data.EGKeyPair.sec, 'ECDH', ['deriveBits'])
+        sec: await importK(data.EGKeyPair.sec, 'ECDH', ['deriveKey', 'deriveBits'])
       }
       for (const [name, certData] of Object.entries(data.certs)) {
         messenger.certs[name] = {
@@ -113,12 +113,12 @@ export class Messenger {
           sendCounter: connData.sendCounter,
           receiveCounter: connData.receiveCounter,
           prevSendCounter: connData.prevSendCounter,
-          rootKey: await importK(connData.rootKey, 'HMAC', ['deriveBits', 'sign']),
+          rootKey: await importK(connData.rootKey, 'HMAC', ['sign']),
           sendChainKey: await importK(connData.sendChainKey, 'HMAC', ['sign']),
           receiveChainKey: await importK(connData.receiveChainKey, 'HMAC', ['sign']),
           sendRatchetKey: connData.sendRatchetKey ? {
             pub: await importK(connData.sendRatchetKey.pub, 'ECDH', []),
-            sec: await importK(connData.sendRatchetKey.sec, 'ECDH', ['deriveBits'])
+            sec: await importK(connData.sendRatchetKey.sec, 'ECDH', ['deriveKey', 'deriveBits'])
           } : null,
           receiveRatchetKey: await importK(connData.receiveRatchetKey, 'ECDH', []),
           skippedKeys: skippedKeysMap,
