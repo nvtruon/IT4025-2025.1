@@ -68,10 +68,22 @@ const styles = {
 function LoginPanel({ isAuthenticated, username, onLogin, onLogout, loading, error }) {
     const [localUsername, setLocalUsername] = useState('');
     const [localPassword, setLocalPassword] = useState('');
+    const [showSettings, setShowSettings] = useState(false);
+    const [serverUrl, setServerUrl] = useState(localStorage.getItem('chat_server_url') || '');
 
     const handleSubmit = (e) => {
         e.preventDefault();
         onLogin(localUsername, localPassword);
+    };
+
+    const handleServerUrlChange = (e) => {
+        const url = e.target.value;
+        setServerUrl(url);
+        if (url) {
+            localStorage.setItem('chat_server_url', url);
+        } else {
+            localStorage.removeItem('chat_server_url');
+        }
     };
 
     if (isAuthenticated) {
@@ -95,7 +107,7 @@ function LoginPanel({ isAuthenticated, username, onLogin, onLogout, loading, err
 
     return (
         <div style={styles.container}>
-            <h3 style={styles.title}>INSERT COIN</h3>
+            <h3 style={styles.title}>SECURE TERMINAL</h3>
             <form onSubmit={handleSubmit} style={styles.form}>
                 <input
                     className="pixel-input"
@@ -115,6 +127,8 @@ function LoginPanel({ isAuthenticated, username, onLogin, onLogout, loading, err
                     required
                     disabled={loading}
                 />
+
+                {/* Reset Local Data Button REMOVED as per Cloud Transport requirement */}
 
                 {error && <div style={styles.error}>ERROR: {error}</div>}
 

@@ -12,6 +12,7 @@ class ChatService {
     this.messageHandlers = [];
     this.serverUrl = 'http://localhost:3000'; // Default port 3000 (configurable via init)
     this._connectionResolvers = []; // For waiting on connection
+    this.messageQueue = Promise.resolve(); // Queue for sequential message processing
   }
 
   /**
@@ -72,9 +73,16 @@ class ChatService {
       console.error('Socket error:', error);
     });
 
-    // Handle incoming messages
-    this.socket.on('message', async (data) => {
-      await this._handleReceive(data);
+    // Handle incoming messages - sequentially!
+    this.socket.on('message', (data) => {
+      // Chain promises to ensure messages are processed one at a time for Ratchet integrity
+      this.messageQueue = this.messageQueue.then(async () => {
+        try {
+          await this._handleReceive(data);
+        } catch (error) {
+          console.error('Error processing queued message:', error);
+        }
+      });
     });
 
     // Handle other events
@@ -322,6 +330,8 @@ class ChatService {
       } catch (error) {
         console.error('Failed to save outgoing message:', error);
       }
+      // Trigger Cloud Backup
+      this.backupSession();
     }
   }
 
@@ -385,6 +395,9 @@ class ChatService {
           console.error('Failed to save incoming message:', error);
         }
       }
+
+      // Trigger Cloud Backup
+      this.backupSession();
 
       // Notify all message handlers
       this.messageHandlers.forEach(handler => {
@@ -488,6 +501,83 @@ class ChatService {
    */
   isConnected() {
     return this.connected && this.socket && this.socket.connected;
+  }
+  /**
+   * Sync session to cloud (Backup)
+   */
+  async backupSession() {
+    if (!this.socket || !this.connected || !this.currentUser) return;
+
+    try {
+      if (StorageService.isInitialized()) {
+        const data = await StorageService.exportEncryptedData();
+        if (data) {
+          this.socket.emit('save_backup', {
+            username: this.currentUser,
+            keychain: data.keychain,
+            digest: data.digest
+          });
+          // console.log('Session backed up to cloud');
+        }
+      }
+    } catch (error) {
+      console.error('Backup failed:', error);
+    }
+  }
+
+  /**
+   * Restore session from cloud
+   * @param {string} username 
+   * @returns {Promise<boolean>} True if restored
+   */
+  async restoreSession(username) {
+    if (!this.socket) this._connectSocket();
+
+    return new Promise((resolve) => {
+      // Wait for connection first
+      if (!this.connected) {
+        this.waitForConnection().then(() => doRestore()).catch(() => resolve(false));
+      } else {
+        doRestore();
+      }
+
+      const doRestore = () => {
+        console.log(`Checking for cloud backup for ${username}...`);
+
+        const onRestored = async (data) => {
+          cleanup();
+          if (data && data.keychain && data.digest) {
+            await StorageService.importEncryptedData(username, data.keychain, data.digest);
+            console.log('Cloud backup found and imported!');
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        };
+
+        const onNotFound = () => {
+          cleanup();
+          console.log('No cloud backup found.');
+          resolve(false);
+        };
+
+        const cleanup = () => {
+          this.socket.off('backup_restored', onRestored);
+          this.socket.off('backup_not_found', onNotFound);
+        };
+
+        this.socket.on('backup_restored', onRestored);
+        this.socket.on('backup_not_found', onNotFound);
+
+        this.socket.emit('restore_backup', { username });
+
+        // Timeout
+        setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 3000);
+      };
+    });
   }
 }
 

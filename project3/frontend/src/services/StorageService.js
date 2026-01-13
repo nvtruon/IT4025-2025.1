@@ -5,11 +5,13 @@ class StorageService {
     this.keychain = null;
     this.initialized = false;
     this.currentUser = null;
+    // Memory-only storage (Lossy on reload/close)
+    this.memoryStorage = new Map();
   }
 
   /**
    * Initialize the storage service for a specific user.
-   * - If user exists: Attempt Login (load keychain).
+   * - If user exists (in memory): Attempt Login (load keychain).
    * - If user new: Attempt Register (create keychain).
    * @param {string} username - Username
    * @param {string} password - Master password
@@ -28,12 +30,12 @@ class StorageService {
     const dataKey = `keychain_data_${username}`;
     const digestKey = `keychain_digest_${username}`;
 
-    const storedKeychain = localStorage.getItem(dataKey);
-    const storedDigest = localStorage.getItem(digestKey);
+    const storedKeychain = this.memoryStorage.get(dataKey);
+    const storedDigest = this.memoryStorage.get(digestKey);
 
     if (storedKeychain && storedDigest) {
       // --- EXISTING USER: LOGIN ---
-      console.log(`Attempting login for existing user: ${username}`);
+      console.log(`Attempting login for existing user (Memory): ${username}`);
       try {
         // Load existing keychain - this will THROW if password is wrong
         this.keychain = await Keychain.load(password, storedKeychain, storedDigest);
@@ -48,6 +50,7 @@ class StorageService {
       // --- NEW USER: REGISTER ---
       console.log(`Creating new account for: ${username}`);
       this.keychain = await Keychain.init(password);
+      // Don't save yet, wait for first action? Or save empty?
       await this._saveKeychain();
     }
 
@@ -55,7 +58,7 @@ class StorageService {
   }
 
   /**
-   * Save keychain to localStorage (namespaced)
+   * Save keychain to memory
    * @private
    */
   async _saveKeychain() {
@@ -65,8 +68,8 @@ class StorageService {
     const dataKey = `keychain_data_${this.currentUser}`;
     const digestKey = `keychain_digest_${this.currentUser}`;
 
-    localStorage.setItem(dataKey, repr);
-    localStorage.setItem(digestKey, digest);
+    this.memoryStorage.set(dataKey, repr);
+    this.memoryStorage.set(digestKey, digest);
   }
 
   /**
@@ -106,7 +109,7 @@ class StorageService {
   }
 
   /**
-   * Encrypt and save a message to localStorage
+   * Encrypt and save a message to memory
    * @param {string} peerName - Name of the peer/recipient
    * @param {object} data - Message data to save (should include timestamp, content, etc.)
    * @returns {Promise<void>}
@@ -203,6 +206,38 @@ class StorageService {
    */
   isInitialized() {
     return this.initialized && this.keychain !== null;
+  }
+  /**
+   * Export raw encrypted keychain data for cloud backup
+   * @returns {Promise<{keychain: string, digest: string}|null>}
+   */
+  async exportEncryptedData() {
+    if (!this.currentUser) return null;
+    const dataKey = `keychain_data_${this.currentUser}`;
+    const digestKey = `keychain_digest_${this.currentUser}`;
+
+    const keychain = this.memoryStorage.get(dataKey);
+    const digest = this.memoryStorage.get(digestKey);
+
+    if (keychain && digest) {
+      return { keychain, digest };
+    }
+    return null;
+  }
+
+  /**
+   * Import raw encrypted keychain data from cloud backup (into MEMORY)
+   * @param {string} keychain - Encrypted keychain blob
+   * @param {string} digest - Integrity digest
+   */
+  async importEncryptedData(username, keychain, digest) {
+    if (!username || !keychain || !digest) return;
+
+    const dataKey = `keychain_data_${username}`;
+    const digestKey = `keychain_digest_${username}`;
+
+    this.memoryStorage.set(dataKey, keychain);
+    this.memoryStorage.set(digestKey, digest);
   }
 }
 

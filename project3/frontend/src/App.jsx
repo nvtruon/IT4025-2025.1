@@ -16,18 +16,40 @@ function App() {
     setLoading(true);
 
     try {
-      // Initialize StorageService with master password and username
-      // The service will automatically detect if this is a Login (existing user)
-      // or Register (new user) based on whether data exists for this username.
-      await StorageService.init(user, password);
-
       // Get cryptographic keys
       const govPublicKey = await getGovPublicKey();
       const caPublicKey = await getCAPublicKey();
 
-      // Initialize ChatService with keys
-      // Use port 3001 to match backend (configurable via third parameter)
-      ChatService.init(caPublicKey, govPublicKey, 'http://localhost:3001');
+      // Priority: 1. Query Param (?server=...) -> 2. LocalStorage -> 3. Env Var -> 4. Default
+      const params = new URLSearchParams(window.location.search);
+      const queryUrl = params.get('server');
+      const storedUrl = localStorage.getItem('chat_server_url');
+
+      const backendUrl = queryUrl || storedUrl || import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+      // If query param provided, save it for future matching convenience
+      if (queryUrl) {
+        localStorage.setItem('chat_server_url', queryUrl);
+      }
+
+      console.log('Connecting to backend at:', backendUrl);
+
+      // Init ChatService FIRST to allow restoreSession
+      ChatService.init(caPublicKey, govPublicKey, backendUrl);
+
+      // --- CLOUD RESTORE LOGIC ---
+      // ALWAYS check cloud backup because we are Memory-Only now.
+      // There is no persistent local storage to check.
+      console.log(`Checking cloud backup for ${user}...`);
+      const restored = await ChatService.restoreSession(user);
+      if (restored) {
+        console.log('Session successfully restored from cloud!');
+      } else {
+        console.log('No cloud backup found. Creating new session.');
+      }
+
+      // Initialize StorageService (will load the restored keys if available)
+      await StorageService.init(user, password);
 
       // Register user with the server (will wait for connection internally)
       await ChatService.register(user);
@@ -38,6 +60,8 @@ function App() {
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to login.');
+      // If failed, disconnect to be safe
+      ChatService.disconnect();
     } finally {
       setLoading(false);
     }

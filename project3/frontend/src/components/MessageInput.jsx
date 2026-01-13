@@ -19,7 +19,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     padding: '20px',
-    borderTop: '0px solid #000',
+
     backgroundColor: '#45283c', // contrast bg
     gap: '12px',
     minHeight: '80px',
