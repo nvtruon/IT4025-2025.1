@@ -231,8 +231,10 @@ class ChatService {
       };
 
       const cleanup = () => {
-        this.socket.off('register_success', onSuccess);
-        this.socket.off('error', onError);
+        if (this.socket) {
+          this.socket.off('register_success', onSuccess);
+          this.socket.off('error', onError);
+        }
       };
 
       this.socket.on('register_success', onSuccess);
@@ -242,6 +244,13 @@ class ChatService {
       // Actually backend checks "if (displayName)", so sending undefined/null is fine (it ignores it).
       // But let's log what we are sending.
       console.log(`[Register] Sending registration for ${username} with name: "${displayName || '(none)'}"`);
+      console.log(`[Register] Payload debug - publicKey:`, publicKeyToSend ? 'PRESENT' : 'MISSING', publicKeyToSend);
+
+      if (!publicKeyToSend) {
+        cleanup();
+        reject(new Error('Failed to generate public key (Key is null)'));
+        return;
+      }
 
       this.socket.emit('register', {
         username: username,
