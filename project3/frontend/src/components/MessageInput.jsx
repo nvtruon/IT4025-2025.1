@@ -25,9 +25,7 @@ function MessageInput({ onSendMessage }) {
         boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
         transition: 'all 0.2s'
       }}>
-        <button type="button" style={{ color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}>
-          <Paperclip size={20} />
-        </button>
+        {/* Paperclip Button REMOVED */}
 
         <input
           type="text"

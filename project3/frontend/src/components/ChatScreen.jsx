@@ -199,28 +199,7 @@ function ChatScreen({ username, displayName, isAuthenticated, onLogin, onLogout,
           </button>
         </div>
 
-        {/* Search */}
-        <div style={{ padding: '16px' }}>
-          <div className="relative" style={{ position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              style={{
-                width: '100%',
-                paddingLeft: '40px',
-                paddingRight: '16px',
-                paddingTop: '8px',
-                paddingBottom: '8px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '9999px',
-                fontSize: '14px',
-                border: 'none',
-                outline: 'none'
-              }}
-            />
-          </div>
-        </div>
+        {/* Search REMOVED */}
 
         {/* User List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }} className="custom-scrollbar">

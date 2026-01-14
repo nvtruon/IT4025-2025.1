@@ -18,23 +18,7 @@ function ChatHeader({ username, status, onMenuClick }) {
       zIndex: 10
     }}>
       <div className="flex items-center" style={{ display: 'flex', alignItems: 'center' }}>
-        {/* Mobile Menu Button */}
-        <button
-          className="md:hidden"
-          onClick={onMenuClick}
-          style={{
-            marginRight: '12px',
-            padding: '8px',
-            color: '#4b5563', // gray-600
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderRadius: '9999px',
-            cursor: 'pointer',
-            display: 'block' // Show by default, hide via CSS media query if possible or JS
-          }}
-        >
-          <Menu size={24} />
-        </button>
+        {/* Mobile Menu Button REMOVED */}
 
         <div style={{ position: 'relative' }}>
           <img
@@ -70,11 +54,10 @@ function ChatHeader({ username, status, onMenuClick }) {
         <button style={{ padding: '8px', borderRadius: '9999px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#4f46e5' }} className="hidden sm:block">
           <Video size={20} />
         </button>
-        <button style={{ padding: '8px', borderRadius: '9999px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#4f46e5' }}>
-          <MoreVertical size={20} />
-        </button>
+        {/* MoreVertical Button REMOVED */}
       </div>
     </header>
+
   );
 }
 

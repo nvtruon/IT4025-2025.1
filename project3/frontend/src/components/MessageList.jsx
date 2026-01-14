@@ -104,7 +104,7 @@ const MessageList = forwardRef(({ messages, currentUser, selectedUserAvatar }, r
                   userSelect: 'none'
                 }}>
                   <span>{formatTime(msg.timestamp)}</span>
-                  {isMe && <CheckCheck size={14} color="#6366f1" />}
+                  {/* Checkmark REMOVED */}
                 </div>
               )}
             </div>
