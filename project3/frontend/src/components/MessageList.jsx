@@ -1,123 +1,121 @@
 import { forwardRef } from 'react';
+import { CheckCheck } from 'lucide-react';
 
-const MessageList = forwardRef(({ messages, loading, formatTime }, ref) => {
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.loading}>LOADING...</div>
-      </div>
-    );
-  }
-
-  if (messages.length === 0) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.emptyChat}>
-          <p>NO MESSAGES.</p>
-          <p>INSERT COIN TO START.</p>
-        </div>
-      </div>
-    );
-  }
+const MessageList = forwardRef(({ messages, currentUser, selectedUserAvatar }, ref) => {
+  const formatTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
-    <div style={styles.container}>
-      {messages.map((message, index) => (
-        <div
-          key={index}
-          style={{
-            ...styles.message,
-            ...(message.direction === 'outgoing' ? styles.messageOutgoing : styles.messageIncoming)
-          }}
-        >
-          <div style={{
-            ...styles.messageContent,
-            ...(message.direction === 'outgoing' ? styles.messageOutgoingContent : styles.messageIncomingContent),
-            ...(message.isError ? styles.messageErrorContent : {})
+    <div style={{
+      flex: 1,
+      overflowY: 'auto',
+      padding: '20px 16px',
+      backgroundColor: '#f8fafc',
+      backgroundImage: `radial-gradient(#e2e8f0 1px, transparent 1px)`,
+      backgroundSize: '24px 24px'
+    }} className="custom-scrollbar">
+      {messages.map((msg, index) => {
+        const isMe = msg.direction === 'outgoing' || msg.sender === currentUser;
+
+        // Grouping Logic
+        const nextMsg = messages[index + 1];
+        const prevMsg = messages[index - 1];
+
+        const isNextSameSender = nextMsg && nextMsg.sender === msg.sender;
+        const isPrevSameSender = prevMsg && prevMsg.sender === msg.sender;
+
+        // Show avatar only if it's the LAST message in a sequence (for incoming)
+        // AND not 'Me'
+        const showAvatar = !isMe && (!isNextSameSender);
+
+        // Dynamic Border Radius
+        // Default all rounded 18px
+        let borderTopRight = '18px';
+        let borderBottomRight = '18px';
+        let borderTopLeft = '18px';
+        let borderBottomLeft = '18px';
+
+        if (isMe) {
+          // Outgoing
+          if (isPrevSameSender) borderTopRight = '4px';
+          if (isNextSameSender) borderBottomRight = '4px';
+          else borderBottomRight = '0'; // Tail for very last
+        } else {
+          // Incoming
+          if (isPrevSameSender) borderTopLeft = '4px';
+          if (isNextSameSender) borderBottomLeft = '4px';
+          else borderBottomLeft = '0'; // Tail for very last
+        }
+
+        return (
+          <div key={index} style={{
+            display: 'flex',
+            justifyContent: isMe ? 'flex-end' : 'flex-start',
+            marginBottom: isNextSameSender ? '2px' : '16px', // Tight spacing for groups
+            alignItems: 'flex-end'
           }}>
-            {message.text}
+            {!isMe && (
+              <div style={{ width: '32px', marginRight: '8px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                {showAvatar && (
+                  <img
+                    src={selectedUserAvatar}
+                    alt="Avatar"
+                    style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+                  />
+                )}
+              </div>
+            )}
+
+            <div style={{ maxWidth: '70%', display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+              <div
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '18px',
+                  borderTopRightRadius: borderTopRight,
+                  borderBottomRightRadius: borderBottomRight,
+                  borderTopLeftRadius: borderTopLeft,
+                  borderBottomLeftRadius: borderBottomLeft,
+
+                  position: 'relative',
+                  fontSize: '15px',
+                  lineHeight: '1.4',
+
+                  backgroundColor: isMe ? '#4f46e5' : '#ffffff',
+                  backgroundImage: isMe ? 'linear-gradient(135deg, #4f46e5, #4338ca)' : 'none',
+                  color: isMe ? 'white' : '#1f2937',
+                  border: isMe ? 'none' : '1px solid #e5e7eb', // gray-200
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                {msg.text}
+              </div>
+
+              {/* Timestamp - Only show for last in group to reduce clutter */}
+              {!isNextSameSender && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginTop: '4px',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  padding: '0 4px',
+                  userSelect: 'none'
+                }}>
+                  <span>{formatTime(msg.timestamp)}</span>
+                  {isMe && <CheckCheck size={14} color="#6366f1" />}
+                </div>
+              )}
+            </div>
           </div>
-          <div style={styles.messageTime}>
-            {formatTime(message.timestamp)}
-          </div>
-        </div>
-      ))}
+        );
+      })}
       <div ref={ref} />
     </div>
   );
 });
 
 MessageList.displayName = 'MessageList';
-
-const styles = {
-  container: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '20px',
-    backgroundColor: '#222034', // var(--pixel-bg-dark)
-    position: 'relative',
-    backgroundImage: 'radial-gradient(#333 1px, transparent 1px)',
-    backgroundSize: '20px 20px'
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#fff',
-    fontFamily: '"VT323", monospace',
-    fontSize: '24px'
-  },
-  emptyChat: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#8f9799',
-    fontSize: '20px'
-  },
-  message: {
-    marginBottom: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    maxWidth: '80%',
-  },
-  messageIncoming: {
-    alignItems: 'flex-start',
-    marginRight: 'auto'
-  },
-  messageOutgoing: {
-    alignItems: 'flex-end',
-    alignSelf: 'flex-end',
-    marginLeft: 'auto'
-  },
-  messageContent: {
-    padding: '15px',
-    fontSize: '18px',
-    lineHeight: '1.4',
-    wordWrap: 'break-word',
-    border: '4px solid #000',
-    boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)',
-    position: 'relative'
-  },
-  messageIncomingContent: {
-    backgroundColor: '#fff',
-    color: '#000',
-  },
-  messageOutgoingContent: {
-    backgroundColor: '#66ccff',
-    color: '#000',
-  },
-  messageErrorContent: {
-    backgroundColor: '#ac3232', // Red
-    color: '#fff',
-    border: '4px solid #fbf236' // Yellow warning border
-  },
-  messageTime: {
-    fontSize: '12px',
-    color: '#8f9799',
-    marginTop: '6px',
-    padding: '0 4px',
-    fontFamily: '"Arial", sans-serif', // Readable font
-    fontWeight: 'bold',
-    opacity: 0.8
-  }
-};
 
 export default MessageList;

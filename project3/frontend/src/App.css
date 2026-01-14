@@ -1,20 +1,16 @@
-/* Retro Pixel Theme */
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
 :root {
-  --pixel-bg-dark: #222034;
-  --pixel-bg-light: #45283c;
-  --pixel-accent: #66ccff;
-  --pixel-accent-hover: #3399cc;
-  --pixel-text: #ffffff;
-  --pixel-text-dim: #8f9799;
-  --pixel-success: #99e550;
-  --pixel-error: #ac3232;
-  --pixel-warning: #fbf236;
-  --pixel-border: #000000;
-
-  --shadow-1: 4px 4px 0px 0px rgba(0, 0, 0, 0.5);
-  --shadow-sm: 2px 2px 0px 0px rgba(0, 0, 0, 0.5);
+  --primary-color: #4f46e5; /* indigo-600 */
+  --primary-hover: #4338ca; /* indigo-700 */
+  --bg-color: #f8fafc; /* gray-50 */
+  --text-main: #1f2937; /* gray-800 */
+  --text-secondary: #6b7280; /* gray-500 */
+  --border-color: #e5e7eb; /* gray-200 */
+  --white: #ffffff;
+  --success: #22c55e; /* green-500 */
+  --error: #ef4444; /* red-500 */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 * {
@@ -23,89 +19,40 @@
 
 body {
   margin: 0;
-  padding: 0;
-  background-color: var(--pixel-bg-dark);
-  font-family: 'VT323', monospace;
-  font-size: 20px;
-  /* Larger base size for pixel font */
-  color: var(--pixel-text);
-  overflow: hidden;
-  -webkit-font-smoothing: none;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg-color);
+  color: var(--text-main);
 }
 
 .App {
-  width: 100vw;
   height: 100vh;
-  display: flex;
+  width: 100vw;
   overflow: hidden;
+  display: flex;
 }
 
-/* Pixel Art Utilities */
-.pixel-border {
-  border: 4px solid var(--pixel-border);
-  box-shadow: var(--shadow-1);
-  background: var(--pixel-bg-light);
-}
-
-.pixel-btn {
-  font-family: 'VT323', monospace;
-  font-size: 20px;
-  background: var(--pixel-accent);
-  color: #000;
-  border: 4px solid var(--pixel-border);
-  padding: 10px 20px;
-  cursor: pointer;
-  box-shadow: var(--shadow-1);
-  text-transform: uppercase;
-  transition: transform 0.1s;
-}
-
-.pixel-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0px 0px rgba(0, 0, 0, 0.5);
-}
-
-.pixel-btn.secondary {
-  background: #76428a;
-  color: #fff;
-}
-
-.pixel-btn.danger {
-  background: var(--pixel-error);
-  color: #fff;
-}
-
-.pixel-input {
-  font-family: 'VT323', monospace;
-  font-size: 18px;
-  padding: 10px;
-  border: 4px solid var(--pixel-border);
-  background: #fff;
-  color: #000;
-  box-shadow: inset 4px 4px 0px 0px rgba(0, 0, 0, 0.1);
-  width: 100%;
-}
-
-.pixel-input:focus {
-  outline: none;
-  background: #f0f0f0;
-}
+/* Utilities */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.flex-1 { flex: 1; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.hidden { display: none; }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-
-::-webkit-scrollbar-track {
-  background: var(--pixel-bg-dark);
-  border-left: 2px solid var(--pixel-border);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-::-webkit-scrollbar-thumb {
-  background: var(--pixel-accent);
-  border: 2px solid var(--pixel-border);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--pixel-accent-hover);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 20px;
 }

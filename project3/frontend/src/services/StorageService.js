@@ -109,6 +109,46 @@ class StorageService {
   }
 
   /**
+   * Save a peer's display name
+   * @param {string} hash - User hash ID
+   * @param {string} name - Display Name
+   */
+  async savePeerName(hash, name) {
+    if (!this.initialized || !this.keychain || !hash || !name) return;
+    try {
+      // We store names individually or in a map? 
+      // Individual keys "peer_name_<hash>" avoids huge blobs, 
+      // but "known_peers_names" map is easier to load all at once.
+      // Let's use a single map for "known_peers_map" = { hash: name }
+
+      let map = {};
+      const raw = await this.keychain.get('known_peers_map');
+      if (raw) map = JSON.parse(raw);
+
+      if (map[hash] !== name) {
+        map[hash] = name;
+        await this.keychain.set('known_peers_map', JSON.stringify(map));
+      }
+    } catch (e) {
+      console.error('Failed to save peer name:', e);
+    }
+  }
+
+  /**
+   * Get all known peer names
+   * @returns {Promise<object>} Map of hash -> name
+   */
+  async getPeerNames() {
+    if (!this.initialized || !this.keychain) return {};
+    try {
+      const raw = await this.keychain.get('known_peers_map');
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /**
    * Encrypt and save a message to memory
    * @param {string} peerName - Name of the peer/recipient
    * @param {object} data - Message data to save (should include timestamp, content, etc.)

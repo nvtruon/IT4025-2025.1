@@ -51,7 +51,10 @@ io.on('connection', (socket) => {
 
   // Register user with public key
   socket.on('register', async (data) => {
-    const { username, publicKey } = data;
+    const { username, publicKey, displayName } = data;
+
+    console.log(`[DEBUG] Register request for ${username ? username.substring(0, 8) : 'unknown'}...`);
+    console.log(`[DEBUG] Payload displayName: "${displayName}" (Type: ${typeof displayName})`);
 
     if (!username || !publicKey) {
       socket.emit('error', { message: 'Username and publicKey are required' });
@@ -60,20 +63,32 @@ io.on('connection', (socket) => {
 
     try {
       // 1. Upsert User in MongoDB (Persistent Identity)
-      await User.findOneAndUpdate(
+      const updateData = { publicKey, lastActive: new Date() };
+      if (displayName) {
+        updateData.displayName = displayName;
+      }
+
+      // If creating new user and no displayName, it will be undefined (schema default might handle it or it stays missing)
+      // Actually schema default is ''.
+      // We want to preserve existing name if displayName is null/undefined in request.
+
+      const userDoc = await User.findOneAndUpdate(
         { username },
-        { publicKey, lastActive: new Date() },
-        { upsert: true, new: true }
+        { $set: updateData },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
       );
 
       // 2. Update Active Session Map
       socketToUser.set(socket.id, username);
 
       console.log(`User registered: ${username} (DB Updated)`);
-      socket.emit('register_success', { message: 'Registration successful' });
+      socket.emit('register_success', {
+        message: 'Registration successful',
+        displayName: userDoc.displayName || ''
+      });
 
       // 3. Broadcast updated user list
-      const allUsers = await User.find({}, 'username publicKey');
+      const allUsers = await User.find({}, 'username publicKey displayName');
       const onlineUsernames = new Set(socketToUser.values());
       const onlineUsers = allUsers.filter(u => onlineUsernames.has(u.username));
       io.emit('users_list', { users: onlineUsers });
@@ -105,7 +120,7 @@ io.on('connection', (socket) => {
   // Get list of all users
   socket.on('get_users', async () => {
     try {
-      const allUsers = await User.find({}, 'username publicKey');
+      const allUsers = await User.find({}, 'username publicKey displayName');
       const onlineUsernames = new Set(socketToUser.values());
       const onlineUsers = allUsers.filter(u => onlineUsernames.has(u.username));
       socket.emit('users_list', { users: onlineUsers });

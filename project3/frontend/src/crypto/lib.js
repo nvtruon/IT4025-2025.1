@@ -155,4 +155,13 @@ export async function signWithECDSA(privateKey, message) {
 // Export bufferToString for use in other files
 export { bufferToString }
 
-// Fixed usages
+export async function digest(message) {
+  // SHA-256 hash
+  const msgBuf = typeof message === 'string' ? new TextEncoder().encode(message) : message
+  const hashBuf = await subtle.digest('SHA-256', msgBuf)
+  // return as hex string
+  return Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+

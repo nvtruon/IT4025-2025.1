@@ -98,16 +98,22 @@ class ChatService {
           if (this.currentUser && user.username === this.currentUser) continue;
 
           try {
-            // The server sends { username, publicKey }
-            // We construct the certificate object as expected by Messenger
+            // The server sends { username, publicKey, displayName }
+            // We construct the certificate object as expected by Messenger, but add displayName for UI
             const certificate = {
               username: user.username,
-              publicKey: user.publicKey
+              publicKey: user.publicKey,
+              displayName: user.displayName // Add display name
             };
 
             // Pass null for signature since server doesn't provide it
             await this.receiveCertificate(certificate, null);
-            console.log(`Received certificate for ${user.username}`);
+            console.log(`Received certificate for ${user.username} (${user.displayName || 'No Name'})`);
+
+            // Save Display Name to Storage for Offline Use
+            if (user.displayName) {
+              await StorageService.savePeerName(user.username, user.displayName);
+            }
           } catch (err) {
             console.error(`Failed to process certificate for ${user.username}:`, err);
           }
@@ -143,10 +149,11 @@ class ChatService {
 
   /**
    * Register user with the server
-   * @param {string} username - Username to register
+   * @param {string} username - Username to register (HASH)
+   * @param {string} displayName - Display name (Plaintext)
    * @returns {Promise<object>} Certificate object
    */
-  async register(username) {
+  async register(username, displayName) {
     if (!this.messenger) {
       throw new Error('ChatService not initialized. Call init() first.');
     }
@@ -155,6 +162,9 @@ class ChatService {
     if (!this.connected) {
       await this.waitForConnection();
     }
+
+    let publicKeyToSend;
+    let certificate = null;
 
     // 1. Try to restore session from storage (Persistence Fix)
     if (StorageService.isInitialized()) {
@@ -173,11 +183,7 @@ class ChatService {
             this.currentUser = username;
 
             const pubKeyJson = await cryptoKeyToJSON(this.messenger.EGKeyPair.pub);
-            this.socket.emit('register', {
-              username: username,
-              publicKey: pubKeyJson
-            });
-            return { username, publicKey: pubKeyJson };
+            publicKeyToSend = pubKeyJson;
           }
         } catch (e) {
           console.warn('Failed to restore session:', e);
@@ -185,23 +191,38 @@ class ChatService {
       }
     }
 
-    // 2. Start fresh if no session
-    // Generate certificate
-    const certificate = await this.messenger.generateCertificate(username);
-    this.currentUser = username;
+    // 2. Start fresh if no session was restored (currentUser not set)
+    if (!this.currentUser) {
+      // Generate certificate
+      certificate = await this.messenger.generateCertificate(username);
+      this.currentUser = username;
+      publicKeyToSend = certificate.publicKey;
 
-    // Save state
-    if (StorageService.isInitialized()) {
-      try {
-        await StorageService.saveMessengerState(await this.messenger.serialize());
-      } catch (e) { console.error("Saving state failed", e); }
+      // Save state
+      if (StorageService.isInitialized()) {
+        try {
+          await StorageService.saveMessengerState(await this.messenger.serialize());
+        } catch (e) { console.error("Saving state failed", e); }
+      }
     }
 
     // Register with server and wait for response
     return new Promise((resolve, reject) => {
-      const onSuccess = () => {
+      const onSuccess = (data) => {
         cleanup();
-        resolve(certificate);
+
+        // Log what the server returned regarding display name
+        console.log('[Register Success] Server returned:', data);
+
+        // Backup the new session to cloud immediately so it persists
+        this.backupSession();
+
+        // Resolve with certificate and returned display name
+        resolve({
+          username,
+          publicKey: publicKeyToSend,
+          displayName: data ? data.displayName : null
+        });
       };
 
       const onError = (err) => {
@@ -217,16 +238,20 @@ class ChatService {
       this.socket.on('register_success', onSuccess);
       this.socket.on('error', onError);
 
+      // Explicitly send displayName only if it's truthy (prevent sending null/undefined explicitly if we want to update)
+      // Actually backend checks "if (displayName)", so sending undefined/null is fine (it ignores it).
+      // But let's log what we are sending.
+      console.log(`[Register] Sending registration for ${username} with name: "${displayName || '(none)'}"`);
+
       this.socket.emit('register', {
         username: username,
-        publicKey: certificate.publicKey
+        publicKey: publicKeyToSend,
+        displayName: displayName // Send display name if provided
       });
 
       // Timeout if no response
       setTimeout(() => {
         cleanup();
-        // Don't reject, just resolve (optimistic) or reject?
-        // If server is strict, we should reject.
         reject(new Error('Registration timed out'));
       }, 5000);
     });
